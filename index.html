@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VEO+ - TV IP</title>
+<meta name="description" content="VEO+ Reproductor de canales IPTV - TV IP">
+<meta name="theme-color" content="#1a1a2e">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>▶</text></svg>">
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://sdk.mercadopago.com/js/v2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;height:100vh;overflow:hidden}
+.app{display:flex;height:100vh}
+.sidebar{width:360px;min-width:360px;background:#12121e;display:flex;flex-direction:column;border-right:1px solid #2a2a4a}
+.sidebar-header{padding:12px 16px;background:#0f0f1a;border-bottom:1px solid #2a2a4a;display:flex;align-items:center;justify-content:space-between}
+.sidebar-header h1{font-size:16px;font-weight:700;color:#b388ff;letter-spacing:1px;display:flex;align-items:center;gap:8px}
+.sidebar-header h1 span{color:#7c4dff}
+.sidebar-header h1 .version{font-size:11px;color:#555;font-weight:400;margin-left:4px}
+.sidebar-header .admin-btn{background:none;border:1px solid #7c4dff;color:#b388ff;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;display:none}
+.sidebar-header .admin-btn:hover{background:#7c4dff;color:#fff}
+.sidebar-header .admin-btn.visible{display:inline-block}
+.search-wrap{padding:12px 16px 0;background:#0f0f1a}
+.search-wrap input{width:100%;padding:10px 14px;border-radius:8px;border:1px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;font-size:14px;outline:none}
+.search-wrap input:focus{border-color:#7c4dff}
+.search-wrap input::placeholder{color:#666}
+.filter-tabs{display:flex;border-bottom:1px solid #1a1a2e}
+.filter-tab{flex:1;padding:8px;background:none;border:none;color:#666;font-size:12px;cursor:pointer;border-bottom:2px solid transparent}
+.filter-tab:hover,.filter-tab.active{color:#b388ff}
+.filter-tab.active{border-bottom-color:#b388ff}
+.channel-count{padding:8px 20px;font-size:12px;color:#888;border-bottom:1px solid #1a1a2e}
+.channel-list{flex:1;overflow-y:auto;padding:4px 0}
+.channel-list::-webkit-scrollbar{width:6px}
+.channel-list::-webkit-scrollbar-track{background:transparent}
+.channel-list::-webkit-scrollbar-thumb{background:#2a2a4a;border-radius:3px}
+.channel-item{display:flex;align-items:center;gap:12px;padding:10px 20px;cursor:pointer;border-bottom:1px solid #1a1a2e}
+.channel-item:hover{background:#1e1e36}
+.channel-item.active{background:#2a1a4a;border-left:3px solid #b388ff}
+.star-btn{background:none;border:none;color:#555;font-size:16px;cursor:pointer;padding:0;line-height:1;flex-shrink:0;width:20px;text-align:center}
+.star-btn:hover,.star-btn.active{color:#ffcc00}
+.channel-number{font-size:12px;color:#666;min-width:28px;font-weight:600}
+.channel-logo{width:32px;height:32px;border-radius:6px;object-fit:cover;flex-shrink:0}
+.channel-no-logo{width:32px;height:32px;border-radius:50%;background:#2a2a4a;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600;color:#b388ff;flex-shrink:0}
+.channel-info{flex:1;min-width:0}
+.channel-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.channel-group{font-size:11px;color:#666;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.no-results{display:none;padding:40px 20px;text-align:center;color:#555;font-size:14px}
+.no-results.visible{display:block}
+.loading{display:none;padding:40px 20px;text-align:center;color:#888}
+.loading.visible{display:block}
+.loading .spinner{display:inline-block;width:24px;height:24px;border:3px solid #2a2a4a;border-top-color:#b388ff;border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.main{flex:1;display:flex;flex-direction:column;background:#0a0a14;position:relative}
+.player-container{flex:1;display:flex;align-items:center;justify-content:center;position:relative}
+.player-container video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+.player-overlay{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;background:rgba(0,0,0,0.7);z-index:10;cursor:pointer}
+.player-overlay.visible{display:flex}
+.player-overlay .msg{font-size:18px;color:#e0e0e0;text-align:center;padding:0 20px}
+.player-overlay .sub-msg{font-size:13px;color:#888;margin-top:8px;text-align:center;padding:0 20px}
+.retry-btn{margin-top:16px;padding:10px 24px;border-radius:8px;border:1px solid #b388ff;background:transparent;color:#b388ff;font-size:14px;cursor:pointer}
+.retry-btn:hover{background:#7c4dff;color:#fff}
+.placeholder{display:flex;align-items:center;justify-content:center;height:100%;color:#333;font-size:20px;flex-direction:column;gap:8px}
+.placeholder.visible{display:flex}
+.controls{padding:12px 20px;background:#0f0f1a;display:flex;align-items:center;gap:16px;border-top:1px solid #2a2a4a;flex-wrap:wrap}
+.controls .volume-wrap{display:flex;align-items:center;gap:8px}
+.controls .volume-wrap input[type="range"]{width:80px;accent-color:#b388ff}
+.controls .volume-wrap .mute-btn{background:none;border:none;font-size:18px;cursor:pointer;line-height:1}
+.controls .active-info{display:none;align-items:center;gap:10px;flex:1;min-width:0}
+.controls .active-info.visible{display:flex}
+.controls .active-logo{width:28px;height:28px;border-radius:4px;object-fit:cover}
+.controls .active-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.controls .active-group{font-size:11px;color:#666;display:flex;align-items:center;gap:6px;margin-top:2px}
+.status-badge{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;white-space:nowrap}
+.status-badge.live{background:#1a3a1a;color:#4caf50}
+.status-badge.premium{background:#3a2a1a;color:#ff9800}
+.status-badge.error{background:#3a1a1a;color:#f44336}
+.channel-item.premium{border-left:3px solid #ff9800}
+.channel-item.premium .channel-name{color:#ffcc00}
+.fs-btn{background:none;border:1px solid #3a3a5a;color:#888;font-size:16px;padding:4px 8px;border-radius:6px;cursor:pointer;line-height:1}
+.fs-btn:hover{border-color:#b388ff;color:#b388ff}
+.fs-btn.active{background:#7c4dff;border-color:#7c4dff;color:#fff}
+.cast-wrap{position:relative;display:flex;align-items:center}
+.cast-btn{width:36px;height:36px;border-radius:50%;border:none;background:#4caf50;color:#fff;cursor:pointer;padding:0;display:flex;align-items:center;justify-content:center;transition:.2s}
+.cast-btn:hover{background:#66bb6a;transform:scale(1.1)}
+.cast-btn svg{width:20px;height:20px;fill:currentColor}
+.cast-btn.connected{background:#b388ff}
+.cast-btn.connected:hover{background:#9c6dff}
+.cast-dropdown{display:none;position:absolute;bottom:calc(100% + 8px);right:0;background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;min-width:240px;max-height:260px;overflow-y:auto;z-index:500;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.cast-dropdown.visible{display:block}
+.cast-dropdown .cast-searching{padding:20px 14px;text-align:center;font-size:13px;color:#555}
+.cast-dropdown .cast-device{padding:10px 14px;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:10px;transition:.15s}
+.cast-dropdown .cast-device:hover{background:#2a2a4a}
+.cast-dropdown .cast-device .dot{width:8px;height:8px;border-radius:50%;background:#4caf50;flex-shrink:0}
+.cast-dropdown .cast-device .dev-name{flex:1;color:#e0e0e0}
+.cast-overlay{display:none;position:absolute;inset:0;background:rgba(0,0,0,.8);align-items:center;justify-content:center;flex-direction:column;z-index:15;gap:8px}
+.cast-overlay.visible{display:flex}
+.cast-overlay .cast-ico{font-size:36px}
+.cast-overlay .cast-msg{font-size:16px;color:#b388ff;font-weight:500}
+.cast-overlay .cast-sub{font-size:12px;color:#888}
+.cast-overlay .cast-stop{background:none;border:1px solid #f44336;color:#f44336;padding:6px 16px;border-radius:6px;font-size:12px;cursor:pointer;margin-top:8px}
+.cast-overlay .cast-stop:hover{background:#f44336;color:#fff}
+.error-msg{display:none;padding:12px 20px;background:#3a1a1a;color:#f44336;font-size:12px;border-top:1px solid #5a2a2a}
+.error-msg.visible{display:block}
+.auth-screen{display:none;position:fixed;inset:0;background:#0a0a14;align-items:center;justify-content:center;z-index:2000;flex-direction:column}
+.auth-screen.visible{display:flex}
+.auth-box{background:#12121e;border:1px solid #2a2a4a;border-radius:16px;padding:40px 32px 32px;width:380px;max-width:90vw}
+.auth-box h1{text-align:center;font-size:24px;font-weight:700;color:#b388ff;margin-bottom:4px;letter-spacing:1px}
+.auth-box h1 span{color:#7c4dff}
+.auth-box .subtitle{text-align:center;font-size:12px;color:#555;margin-bottom:24px}
+.auth-tabs{display:flex;margin-bottom:20px;border-bottom:1px solid #2a2a4a}
+.auth-tab{flex:1;padding:10px;background:none;border:none;color:#666;font-size:13px;cursor:pointer;border-bottom:2px solid transparent}
+.auth-tab:hover,.auth-tab.active{color:#b388ff}
+.auth-tab.active{border-bottom-color:#b388ff}
+.auth-form{display:none}
+.auth-form.visible{display:block}
+.auth-form input{width:100%;padding:12px 14px;border-radius:8px;border:1px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;font-size:14px;outline:none;margin-bottom:12px}
+.auth-form input:focus{border-color:#7c4dff}
+.auth-form .pw-wrap{position:relative;margin-bottom:12px}
+.auth-form .pw-wrap input{margin-bottom:0;padding-right:40px}
+.auth-form .pw-toggle{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:#666;font-size:18px;cursor:pointer;padding:4px;line-height:1}
+.auth-form .pw-toggle:hover{color:#b388ff}
+.auth-form .auth-btn{width:100%;padding:12px;border-radius:8px;border:none;background:#7c4dff;color:#fff;font-size:14px;font-weight:600;cursor:pointer}
+.auth-form .auth-btn:hover{background:#651fff}
+.auth-form .auth-btn:disabled{opacity:.5;cursor:default}
+.auth-form .auth-error{color:#f44336;font-size:12px;margin-top:8px;text-align:center}
+.auth-form .auth-success{color:#4caf50;font-size:12px;margin-top:8px;text-align:center}
+.auth-form .forgot-link{display:block;text-align:right;font-size:12px;color:#555;cursor:pointer;margin:-8px 0 12px;text-decoration:none}
+.auth-form .forgot-link:hover{color:#b388ff}
+.auth-user{font-size:11px;color:#666;cursor:pointer;padding:4px 8px;border-radius:4px}
+.auth-user:hover{color:#f44336}
+.sidebar-footer{border-top:1px solid #1a1a2e;padding:8px 12px;display:flex;gap:6px;flex-shrink:0}
+.sidebar-footer .s-btn{flex:1;padding:6px 8px;border-radius:6px;border:1px solid #2a2a4a;background:transparent;color:#666;font-size:11px;cursor:pointer;text-align:center}
+.sidebar-footer .s-btn:hover{border-color:#7c4dff;color:#b388ff}
+.premium-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);align-items:center;justify-content:center;z-index:2000;flex-direction:column}
+.premium-overlay.visible{display:flex}
+.premium-box{background:#1a1a2e;border:1px solid #ff9800;border-radius:16px;padding:40px 32px;width:420px;max-width:90vw;text-align:center}
+.premium-box .lock-icon{font-size:48px;margin-bottom:12px}
+.premium-box h2{color:#ffcc00;font-size:22px;margin-bottom:8px}
+.premium-box p{color:#aaa;font-size:14px;margin-bottom:20px;line-height:1.5}
+.premium-box .price{font-size:36px;font-weight:700;color:#ff9800;margin-bottom:4px}
+.premium-box .price-label{font-size:13px;color:#666;margin-bottom:24px}
+.premium-box .mp-btn{display:block;width:100%;padding:14px;border-radius:10px;border:none;background:#009ee3;color:#fff;font-size:16px;font-weight:600;cursor:pointer;margin-bottom:12px}
+.premium-box .mp-btn:hover{background:#0086cc}
+.premium-box .mp-btn:disabled{opacity:.5;cursor:default}
+.premium-box .close-btn{background:none;border:1px solid #2a2a4a;padding:10px 20px;border-radius:8px;color:#888;font-size:13px;cursor:pointer}
+.premium-box .close-btn:hover{color:#f44336;border-color:#f44336}
+.premium-box .sub-status{margin-top:16px;padding:12px;background:#12121e;border-radius:8px;font-size:12px;color:#888}
+.premium-box .sub-status strong{color:#4caf50}
+.premium-box .sub-status.expired strong{color:#f44336}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;z-index:1000}
+.modal-overlay.visible{display:flex}
+.modal-box{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:24px;min-width:320px;max-width:90vw}
+.modal-box h3{margin-bottom:16px;color:#b388ff;font-size:16px}
+.modal-box .modal-btns{display:flex;gap:8px;justify-content:flex-end}
+.modal-box .modal-btns button{padding:8px 16px;border-radius:6px;border:1px solid #2a2a4a;background:transparent;color:#888;font-size:13px;cursor:pointer}
+.modal-box .modal-btns button.primary{border-color:#7c4dff;color:#b388ff}
+.modal-box .modal-btns button.primary:hover{background:#7c4dff;color:#fff}
+.modal-box .modal-btns button:hover{background:#2a2a4a}
+.suggest-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;z-index:2000}
+.suggest-modal.visible{display:flex}
+.suggest-box{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:12px;padding:24px;width:400px;max-width:90vw}
+.suggest-box h3{color:#b388ff;font-size:16px;margin-bottom:16px}
+.suggest-box input,.suggest-box textarea{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #2a2a4a;background:#12121e;color:#e0e0e0;font-size:13px;outline:none;margin-bottom:12px}
+.suggest-box textarea{min-height:90px;resize:vertical;font-family:inherit}
+.suggest-box input:focus,.suggest-box textarea:focus{border-color:#7c4dff}
+.suggest-box .modal-btns{display:flex;gap:8px;justify-content:flex-end}
+.suggest-box .modal-btns button{padding:8px 20px;border-radius:6px;border:1px solid #2a2a4a;background:transparent;color:#888;font-size:13px;cursor:pointer}
+.suggest-box .modal-btns button.primary{border-color:#7c4dff;color:#b388ff}
+.suggest-box .modal-btns button.primary:hover{background:#7c4dff;color:#fff}
+.suggest-box .modal-btns button:hover{background:#2a2a4a}
+.ip-block-screen{display:none;position:fixed;inset:0;background:#0a0a14;z-index:3000;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px}
+.ip-block-screen.visible{display:flex}
+.ip-block-screen .ip-icon{font-size:64px;margin-bottom:16px}
+.ip-block-screen h2{color:#f44336;font-size:22px;margin-bottom:8px}
+.ip-block-screen p{color:#aaa;font-size:14px;max-width:400px;line-height:1.6;margin-bottom:24px}
+.ip-block-screen .ip-addr{font-family:monospace;background:#1e1e36;padding:8px 16px;border-radius:8px;color:#ff9800;font-size:16px;margin-bottom:24px}
+.ip-block-screen .ip-btn{padding:12px 24px;border-radius:8px;border:1px solid #7c4dff;background:transparent;color:#b388ff;font-size:14px;cursor:pointer}
+.ip-block-screen .ip-btn:hover{background:#7c4dff;color:#fff}
+.admin-panel{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1500;flex-direction:column}
+.admin-panel.visible{display:flex}
+.admin-header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;background:#12121e;border-bottom:1px solid #2a2a4a}
+.admin-header h2{font-size:18px;color:#b388ff}
+.admin-header .admin-close{background:none;border:none;color:#888;font-size:20px;cursor:pointer;padding:4px 8px}
+.admin-header .admin-close:hover{color:#f44336}
+.admin-body{flex:1;overflow-y:auto;padding:20px 24px}
+.admin-tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid #2a2a4a}
+.admin-tab{padding:10px 20px;background:none;border:none;border-bottom:2px solid transparent;color:#666;font-size:13px;cursor:pointer}
+.admin-tab:hover,.admin-tab.active{color:#b388ff}
+.admin-tab.active{border-bottom-color:#b388ff}
+.admin-section{display:none}
+.admin-section.visible{display:block}
+.admin-section h3{font-size:14px;color:#888;margin-bottom:12px}
+.admin-table{width:100%;border-collapse:collapse}
+.admin-table th{text-align:left;padding:10px 12px;font-size:12px;color:#666;border-bottom:1px solid #2a2a4a;font-weight:600}
+.admin-table td{padding:10px 12px;font-size:13px;border-bottom:1px solid #1a1a2e}
+.admin-table tr:hover td{background:#1a1a2e}
+.role-badge{padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600}
+.role-badge.seller{background:#2a1a4a;color:#b388ff}
+.role-badge.user{background:#1a2a3a;color:#64b5f6}
+.role-badge.active{background:#1a3a1a;color:#4caf50}
+.role-badge.inactive{background:#3a1a1a;color:#f44336}
+.role-badge.expired{background:#3a2a1a;color:#ff9800}
+.admin-action-btn{background:none;border:1px solid #2a2a4a;padding:4px 10px;border-radius:4px;color:#888;font-size:11px;cursor:pointer;margin-right:4px}
+.admin-action-btn:hover{border-color:#7c4dff;color:#b388ff}
+.admin-action-btn.danger:hover{border-color:#f44336;color:#f44336}
+.admin-add-btn{padding:8px 16px;border-radius:6px;border:1px solid #7c4dff;background:transparent;color:#b388ff;font-size:12px;cursor:pointer;margin-bottom:12px}
+.admin-add-btn:hover{background:#7c4dff;color:#fff}
+.admin-save-btn{padding:10px 20px;border-radius:6px;border:none;background:#7c4dff;color:#fff;font-size:13px;cursor:pointer;margin-top:12px}
+.admin-save-btn:hover{background:#651fff}
+.admin-config input{width:100%;padding:10px 12px;border-radius:8px;border:1px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;font-size:13px;outline:none}
+.admin-config input:focus{border-color:#7c4dff}
+.admin-ch-list{max-height:400px;overflow-y:auto;border:1px solid #2a2a4a;border-radius:8px}
+.admin-ch-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #1a1a2e}
+.admin-ch-item:last-child{border-bottom:none}
+.admin-ch-item .ch-info{flex:1;min-width:0}
+.admin-ch-item .ch-name{font-size:13px}
+.admin-ch-item .ch-url{font-size:10px;color:#555;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.block-toggle{background:none;border:1px solid #2a2a4a;border-radius:4px;padding:4px 8px;font-size:11px;cursor:pointer;color:#888;flex-shrink:0}
+.block-toggle:hover{border-color:#f44336;color:#f44336}
+.block-toggle.blocked{background:#3a1a1a;border-color:#f44336;color:#f44336}
+.block-toggle.blocked:hover{border-color:#4caf50;color:#4caf50}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <div>
+        <h1><span>&#9654;</span> VEO+ <span class="version">v2.0 Web</span></h1>
+      </div>
+      <button class="admin-btn" id="adminBtn">&#9881; Admin</button>
+    </div>
+    <div class="search-wrap">
+      <input type="text" id="searchInput" placeholder="&#128269; Buscar canales...">
+    </div>
+    <div class="filter-tabs" id="filterTabs">
+      <button class="filter-tab active" data-filter="public">&#128250; PÚBLICO</button>
+      <button class="filter-tab" data-filter="premium">&#128274; PREMIUM</button>
+      <button class="filter-tab" data-filter="favs">&#9733; FAVORITOS</button>
+    </div>
+    <div class="channel-count" id="channelCount"></div>
+    <div class="channel-list" id="channelList"></div>
+    <div class="no-results" id="noResults">&#128533; No se encontraron canales</div>
+    <div class="loading" id="loading"><div class="spinner"></div><div style="margin-top:8px;font-size:12px;color:#888">Cargando canales...</div></div>
+    <div class="sidebar-footer">
+      <button class="s-btn" id="suggestBtn">&#128161; Sugerir canal</button>
+      <button class="s-btn" id="supportBtn">&#128683; Soporte</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="player-container" id="playerContainer">
+      <div class="placeholder visible" id="placeholder">
+        <div style="font-size:48px;color:#2a2a4a;">&#9654;</div>
+        <div>Seleccioná un canal para empezar</div>
+      </div>
+      <div class="player-overlay" id="playerOverlay">
+        <div class="msg" id="overlayMsg">&#9203; Cargando...</div>
+        <div class="sub-msg" id="overlaySubMsg"></div>
+        <button class="retry-btn" id="retryBtn" style="display:none">Reintentar</button>
+      </div>
+      <video id="video" playsinline></video>
+      <div class="cast-overlay" id="castOverlay">
+        <div class="cast-ico">&#128250;</div>
+        <div class="cast-msg" id="castMsg">Transmitiendo...</div>
+        <div class="cast-sub" id="castSub">a Chromecast</div>
+        <button class="cast-stop" id="castStopBtn">&#9632; Detener transmisi&#243;n</button>
+      </div>
+    </div>
+    <div class="controls">
+      <div class="active-info" id="activeInfo">
+        <img class="active-logo" id="activeLogo" style="display:none;">
+        <div>
+          <div class="active-name" id="activeName"></div>
+          <div class="active-group" id="activeGroup"><span class="status-badge live" id="liveBadge">EN VIVO</span></div>
+        </div>
+      </div>
+      <div class="volume-wrap">
+        <button class="mute-btn" id="muteBtn">&#128266;</button>
+        <input type="range" id="volumeSlider" min="0" max="1" step="0.05" value="1">
+      </div>
+      <div class="cast-wrap">
+        <button class="cast-btn" id="castBtn" title="Transmitir a Chromecast"><svg viewBox="0 0 24 24"><path d="M21 3H3c-1.1 0-2 .9-2 2v3h2V5h18v14h-7v2h7c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/><path d="M1 18v3h3c0-1.66-1.34-3-3-3zm0-4v2c2.76 0 5 2.24 5 5h2c0-3.87-3.13-7-7-7zm0-4v2c4.97 0 9 4.03 9 9h2c0-6.08-4.93-11-11-11z"/></svg></button>
+        <div class="cast-dropdown" id="castDropdown">
+          <div class="cast-searching" id="castSearching">&#9203; Buscando Chromecast...</div>
+          <div class="cast-devices" id="castDevices"></div>
+        </div>
+      </div>
+      <button class="fs-btn" id="fsBtn" title="Pantalla completa">&#11036;</button>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+  </main>
+</div>
+
+<!-- Auth Screen -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-box">
+    <h1><span>&#9654;</span> VEO+ <span style="font-size:12px;color:#555;font-weight:400;">v2.0 Web</span></h1>
+    <div class="subtitle">TV IP - Reproductor de canales</div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">Iniciar sesi&#243;n</button>
+      <button class="auth-tab" data-tab="register">Registrarse</button>
+    </div>
+    <div class="auth-form visible" id="authLogin">
+      <input type="email" id="loginEmail" placeholder="Correo electr&#243;nico" autocomplete="email">
+      <div class="pw-wrap"><input type="password" id="loginPass" placeholder="Contrase&#241;a" autocomplete="current-password"><button class="pw-toggle" data-target="loginPass" tabindex="-1">&#128065;</button></div>
+      <a class="forgot-link" id="forgotLink">&#191;Olvidaste tu contrase&#241;a?</a>
+      <button class="auth-btn" id="loginBtn">Iniciar sesi&#243;n</button>
+      <div class="auth-error" id="loginError"></div>
+    </div>
+    <div class="auth-form" id="authRegister">
+      <input type="email" id="regEmail" placeholder="Correo electr&#243;nico" autocomplete="email">
+      <div class="pw-wrap"><input type="password" id="regPass" placeholder="Contrase&#241;a (m&#237;n. 6 caracteres)" autocomplete="new-password"><button class="pw-toggle" data-target="regPass" tabindex="-1">&#128065;</button></div>
+      <button class="auth-btn" id="regBtn">Crear cuenta</button>
+      <div class="auth-error" id="regError"></div>
+      <div class="auth-success" id="regSuccess"></div>
+    </div>
+  </div>
+</div>
+
+<!-- IP Block Screen -->
+<div class="ip-block-screen" id="ipBlockScreen">
+  <div class="ip-icon">&#128683;</div>
+  <h2>IP No Autorizada</h2>
+  <p id="ipBlockMsg">Tu cuenta est&#225; vinculada a otra direcci&#243;n IP. No pod&#233;s acceder desde esta red.</p>
+  <div class="ip-addr" id="ipBlockAddr"></div>
+  <p style="font-size:12px;color:#666">Si cambi&#225;ste de domicilio o red, contact&#225; al soporte para liberar tu IP.</p>
+  <button class="ip-btn" id="ipLogoutBtn">Cerrar sesi&#243;n</button>
+</div>
+
+<!-- Premium Overlay -->
+<div class="premium-overlay" id="premiumOverlay">
+  <div class="premium-box">
+    <div class="lock-icon">&#128274;</div>
+    <h2>Canales Premium</h2>
+    <p>Suscribite por <strong>$5.000/mes</strong> y acced&#233; a todos los canales premium sin restricciones.</p>
+    <div class="price">$5.000</div>
+    <div class="price-label">por mes &mdash; cancel&#225; cuando quieras</div>
+    <div class="sub-status" id="subStatusInfo" style="display:none"></div>
+    <button class="mp-btn" id="mpPayBtn">Suscribirme v&#237;a Mercado Pago</button>
+    <button class="close-btn" id="mpCloseBtn">Cerrar</button>
+  </div>
+</div>
+
+<!-- Suggest/Support Modal -->
+<div class="suggest-modal" id="suggestModal">
+  <div class="suggest-box">
+    <h3 id="suggestTitle">Sugerir canal</h3>
+    <input type="text" id="suggestSubject" placeholder="Asunto">
+    <textarea id="suggestDesc" placeholder="Descripci&#243;n (opcional)"></textarea>
+    <div class="modal-btns">
+      <button id="suggestCancel">Cancelar</button>
+      <button class="primary" id="suggestSend">Enviar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin Panel -->
+<div class="admin-panel" id="adminPanel">
+  <div class="admin-header">
+    <h2>&#9881; Panel de Administraci&#243;n</h2>
+    <button class="admin-close" id="adminCloseBtn">&#10005;</button>
+  </div>
+  <div class="admin-body">
+    <div class="admin-tabs">
+      <button class="admin-tab active" data-section="users">Usuarios</button>
+      <button class="admin-tab" data-section="config">Configuraci&#243;n</button>
+      <button class="admin-tab" data-section="channels">Canales</button>
+    </div>
+    <div class="admin-section visible" id="adminUsers">
+      <h3>Usuarios registrados</h3>
+      <button class="admin-add-btn" id="adminAddUserBtn">+ Nuevo usuario</button>
+      <table class="admin-table">
+        <thead><tr><th>Email</th><th>Rol</th><th>Suscripci&#243;n</th><th>IP</th><th>Acciones</th></tr></thead>
+        <tbody id="adminUsersBody"></tbody>
+      </table>
+    </div>
+    <div class="admin-section" id="adminConfig">
+      <h3>Configuraci&#243;n general</h3>
+      <label style="font-size:13px;color:#888;">URL lista P&#250;BLICA (oculta para usuarios)</label>
+      <div class="admin-config" style="margin-top:4px;">
+        <input type="text" id="adminM3uUrlPublic" placeholder="https://...">
+      </div>
+      <label style="font-size:13px;color:#888;margin-top:12px;">URL lista PREMIUM (oculta para usuarios)</label>
+      <div class="admin-config" style="margin-top:4px;">
+        <input type="text" id="adminM3uUrlPremium" placeholder="https://...">
+      </div>
+      <div style="margin-top:16px;">
+        <label style="font-size:13px;color:#888;">URL Webhook Mercado Pago</label>
+        <div class="admin-config" style="margin-top:4px;">
+          <input type="text" id="adminWebhookUrl" placeholder="https://TU-WORKER.workers.dev/webhook/mercadopago" disabled>
+        </div>
+        <p style="font-size:11px;color:#555;margin-top:4px;">Configurar en Cloudflare Worker. Esta es solo referencia.</p>
+      </div>
+      <button class="admin-save-btn" id="adminSaveConfig">Guardar configuraci&#243;n</button>
+      <div class="auth-error" id="adminConfigError"></div>
+    </div>
+    <div class="admin-section" id="adminChannels">
+      <h3>Gesti&#243;n de canales bloqueados</h3>
+      <p style="font-size:12px;color:#555;margin-bottom:12px;">Los canales bloqueados no se mostrar&#225;n a los usuarios regulares.</p>
+      <input type="text" id="adminChSearch" placeholder="&#128269; Buscar canal para bloquear/desbloquear..." style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;font-size:13px;outline:none;margin-bottom:12px;">
+      <div class="admin-ch-list" id="adminChList"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ CONFIG ============
+const SUPABASE_URL = 'https://inbefoswtvjcwhxvbnef.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_TmR3AY-nyOIpVT5QzP8E6g_gFNcYJWm';
+const WORKER_URL = 'https://veo-plus-worker.hgastonsanchez.workers.dev';
+const MP_PUBLIC_KEY = 'YOUR_MP_PUBLIC_KEY';
+
+// ============ SUPABASE ============
+const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
+let currentRole = 'user';
+let userProfile = null;
+let blockedChannels = [];
+let serverM3uUrlPublic = '';
+let serverM3uUrlPremium = '';
+
+// Auth elements
+const authScreen = document.getElementById('authScreen');
+const loginEmail = document.getElementById('loginEmail');
+const loginPass = document.getElementById('loginPass');
+const regEmail = document.getElementById('regEmail');
+const regPass = document.getElementById('regPass');
+const loginBtn = document.getElementById('loginBtn');
+const regBtn = document.getElementById('regBtn');
+const loginError = document.getElementById('loginError');
+const regError = document.getElementById('regError');
+const regSuccess = document.getElementById('regSuccess');
+const premiumOverlay = document.getElementById('premiumOverlay');
+const ipBlockScreen = document.getElementById('ipBlockScreen');
+
+// Password toggles
+document.querySelectorAll('.pw-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const inp = document.getElementById(btn.dataset.target);
+    if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '\u{1F44B}'; }
+    else { inp.type = 'password'; btn.textContent = '\u{1F441}'; }
+  });
+});
+
+// Auth tabs
+document.querySelectorAll('.auth-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    loginError.textContent = '';
+    regError.textContent = '';
+    regSuccess.textContent = '';
+    document.getElementById('authLogin').classList.toggle('visible', tab.dataset.tab === 'login');
+    document.getElementById('authRegister').classList.toggle('visible', tab.dataset.tab === 'register');
+  });
+});
+
+// Login
+loginBtn.addEventListener('click', async () => {
+  const email = loginEmail.value.trim();
+  const pass = loginPass.value;
+  if (!email || !pass) { loginError.textContent = 'Completá todos los campos'; return; }
+  loginError.textContent = '';
+  loginBtn.disabled = true; loginBtn.textContent = 'Ingresando...';
+  const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password: pass });
+  loginBtn.disabled = false; loginBtn.textContent = 'Iniciar sesión';
+  if (error) { loginError.textContent = error.message; return; }
+  await onAuthSuccess(data.user);
+});
+
+// Register
+regBtn.addEventListener('click', async () => {
+  const email = regEmail.value.trim();
+  const pass = regPass.value;
+  if (!email || !pass) { regError.textContent = 'Completá todos los campos'; return; }
+  if (pass.length < 6) { regError.textContent = 'La contraseña debe tener al menos 6 caracteres'; return; }
+  regError.textContent = '';
+  regBtn.disabled = true; regBtn.textContent = 'Creando cuenta...';
+  const { data, error } = await supabaseClient.auth.signUp({ email, password: pass });
+  regBtn.disabled = false; regBtn.textContent = 'Crear cuenta';
+  if (error) { regError.textContent = error.message; return; }
+  if (data.user && data.user.identities && data.user.identities.length === 0) {
+    regError.textContent = 'Este correo ya está registrado. Iniciá sesión.';
+  } else {
+    regSuccess.textContent = 'Cuenta creada. Revisá tu correo para confirmar el registro.';
+  }
+});
+
+// Forgot password
+document.getElementById('forgotLink').addEventListener('click', async () => {
+  const email = loginEmail.value.trim();
+  if (!email) { loginError.textContent = 'Ingresá tu correo primero'; return; }
+  loginError.textContent = '';
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.href });
+  if (error) { loginError.textContent = error.message; return; }
+  loginError.style.color = '#4caf50';
+  loginError.textContent = '✓ Revisá tu correo para restablecer la contraseña';
+  setTimeout(() => { loginError.textContent = ''; loginError.style.color = ''; }, 5000);
+});
+
+// IP Logout
+document.getElementById('ipLogoutBtn').addEventListener('click', async () => {
+  await supabaseClient.auth.signOut();
+  location.reload();
+});
+
+// ============ AUTH SUCCESS ============
+async function onAuthSuccess(user) {
+  currentUser = user;
+  let { data: profile, error: pErr } = await supabaseClient.from('profiles').select('*').eq('id', user.id).single();
+  if (!profile) {
+    const { data: ins } = await supabaseClient.from('profiles').insert({ id: user.id, email: user.email, role: 'user', subscription_status: 'inactive' }).select('*').single();
+    profile = ins;
+  }
+  userProfile = profile;
+  currentRole = profile ? profile.role : 'user';
+  authScreen.classList.remove('visible');
+
+  // IP check via Worker
+  if (currentRole !== 'seller') {
+    const ipOk = await checkIpBinding();
+    if (!ipOk) return;
+  }
+
+  document.querySelector('.auth-user')?.remove();
+  const userEl = document.createElement('span');
+  userEl.className = 'auth-user';
+  userEl.textContent = user.email + (currentRole === 'seller' ? ' (admin)' : '') + ' — cerrar sesión';
+  userEl.addEventListener('click', async () => { await supabaseClient.auth.signOut(); location.reload(); });
+  document.querySelector('.sidebar-header > div').appendChild(userEl);
+  if (currentRole === 'seller') document.getElementById('adminBtn').classList.add('visible');
+  await loadBlockedChannels();
+  await loadSettings();
+  startApp();
+}
+
+// ============ IP BINDING ============
+async function checkIpBinding() {
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) return true;
+
+    const resp = await fetch(`${WORKER_URL}/api/check-ip`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        user_id: currentUser.id,
+        ip: await getUserIp(),
+      }),
+    });
+
+    const result = await resp.json();
+    if (!result.ip_bound) {
+      document.getElementById('ipBlockMsg').textContent = result.message;
+      document.getElementById('ipBlockAddr').textContent = result.bound_ip || 'Desconocida';
+      ipBlockScreen.classList.add('visible');
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.warn('IP check failed, continuing:', e);
+    return true;
+  }
+}
+
+async function getUserIp() {
+  try {
+    const resp = await fetch('https://api.ipify.org?format=json');
+    const data = await resp.json();
+    return data.ip;
+  } catch {
+    return 'unknown';
+  }
+}
+
+// ============ SESSION RESTORE ============
+async function restoreSession() {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session) await onAuthSuccess(session.user);
+  else authScreen.classList.add('visible');
+}
+
+async function loadBlockedChannels() {
+  const { data } = await supabaseClient.from('channel_blocks').select('channel_url, channel_name');
+  blockedChannels = data || [];
+}
+
+async function loadSettings() {
+  const { data } = await supabaseClient.from('settings').select('key, value');
+  if (!data) return;
+  data.forEach(s => {
+    if (s.key === 'm3u_url_public' && s.value) serverM3uUrlPublic = s.value;
+    if (s.key === 'm3u_url_premium' && s.value) serverM3uUrlPremium = s.value;
+  });
+}
+
+// ============ CHANNEL PROXY ============
+async function fetchChannelsFromWorker(type) {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (!session) throw new Error('No hay sesión');
+
+  const resp = await fetch(`${WORKER_URL}/channels/${type}`, {
+    headers: { 'Authorization': `Bearer ${session.access_token}` },
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.message || err.error || `Error ${resp.status}`);
+  }
+
+  return await resp.text();
+}
+
+// ============ APP ============
+let hlsInstance = null;
+let channels = [];
+let filteredChannels = [];
+let currentChannel = null;
+let retryChannel = null;
+let isMuted = false;
+let favorites = [];
+const FAV_KEY = 'iptv_favorites';
+
+function loadFavorites() { try { favorites = JSON.parse(localStorage.getItem(FAV_KEY)) || []; } catch { favorites = []; } }
+function saveFavorites() { localStorage.setItem(FAV_KEY, JSON.stringify(favorites)); }
+function isFavorite(url) { return favorites.includes(url); }
+function toggleFavorite(url) {
+  const idx = favorites.indexOf(url);
+  if (idx === -1) favorites.push(url); else favorites.splice(idx, 1);
+  saveFavorites(); renderChannels(filteredChannels); updateFavTabCount();
+}
+function updateFavTabCount() {
+  const t = document.querySelector('.filter-tab[data-filter="favs"]');
+  if (t) t.textContent = '★ Favoritos (' + favorites.length + ')';
+}
+
+// DOM refs
+const channelList = document.getElementById('channelList');
+const searchInput = document.getElementById('searchInput');
+const channelCount = document.getElementById('channelCount');
+const noResults = document.getElementById('noResults');
+const loading = document.getElementById('loading');
+const playerOverlay = document.getElementById('playerOverlay');
+const overlayMsg = document.getElementById('overlayMsg');
+const overlaySubMsg = document.getElementById('overlaySubMsg');
+const retryBtn = document.getElementById('retryBtn');
+const video = document.getElementById('video');
+const volumeSlider = document.getElementById('volumeSlider');
+const muteBtn = document.getElementById('muteBtn');
+const placeholder = document.getElementById('placeholder');
+const activeInfo = document.getElementById('activeInfo');
+const activeName = document.getElementById('activeName');
+const activeGroup = document.getElementById('activeGroup');
+const activeLogo = document.getElementById('activeLogo');
+const errorMsg = document.getElementById('errorMsg');
+const fsBtn = document.getElementById('fsBtn');
+
+function parseM3U(text) {
+  const lines = text.split('\n');
+  const result = [];
+  let currentExtInf = null;
+  for (let line of lines) {
+    line = line.trim();
+    if (!line) continue;
+    if (line.startsWith('#EXTM3U')) continue;
+    if (line.startsWith('#EXTINF:')) {
+      const attrs = {};
+      const attrRegex = /(\w[\w-]*)\s*=\s*"([^"]*)"/g;
+      let match;
+      while ((match = attrRegex.exec(line)) !== null) attrs[match[1]] = match[2];
+      const commaIdx = line.lastIndexOf(',');
+      const name = commaIdx !== -1 ? line.substring(commaIdx + 1).trim() : '';
+      const group = (attrs['group-title'] || 'Sin grupo').trim();
+      currentExtInf = { name: attrs['tvg-name'] || name, tvgLogo: attrs['tvg-logo'] || '', tvgChno: attrs['tvg-chno'] || '', groupTitle: group, premium: group.toUpperCase() === 'PREMIUM' };
+      continue;
+    }
+    if (!line.startsWith('#') && currentExtInf) { result.push({ ...currentExtInf, url: line }); currentExtInf = null; }
+  }
+  if (currentExtInf) result.push({ ...currentExtInf, url: '' });
+  return result;
+}
+
+function renderChannels(list) {
+  if (!Array.isArray(list)) return;
+  const showAll = currentRole === 'seller';
+  const visibleList = showAll ? list : list.filter(ch => !blockedChannels.some(b => b.channel_url === ch.url));
+  channelList.innerHTML = '';
+  if (visibleList.length === 0) noResults.classList.add('visible');
+  else noResults.classList.remove('visible');
+  visibleList.forEach((ch, i) => {
+    const item = document.createElement('div');
+    item.className = 'channel-item' + (currentChannel && currentChannel.url === ch.url ? ' active' : '') + (ch.premium ? ' premium' : '');
+    item.dataset.index = i;
+    const hasLogo = ch.tvgLogo && ch.tvgLogo.trim();
+    const starred = isFavorite(ch.url);
+    item.innerHTML = '<button class="star-btn' + (starred ? ' active' : '') + '" data-url="' + ch.url.replace(/"/g, '&quot;') + '">' + (starred ? '★' : '☆') + '</button>' +
+      '<span class="channel-number">' + (ch.tvgChno || '') + '</span>' +
+      (hasLogo ? '<img class="channel-logo" src="' + ch.tvgLogo + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '<div class="channel-no-logo">' + ch.name.charAt(0).toUpperCase() + '</div>') +
+      '<div class="channel-info"><div class="channel-name">' + (ch.premium ? '🔒 ' : '') + ch.name + '</div><div class="channel-group">' + (ch.premium ? '<span class="status-badge premium">PREMIUM</span> ' : '') + ch.groupTitle + '</div></div>';
+    channelList.appendChild(item);
+  });
+  const total = visibleList.length;
+  channelCount.textContent = total + ' canal' + (total !== 1 ? 'es' : '') + (total !== list.length ? ' (' + list.length + ' totales)' : '');
+}
+
+channelList.addEventListener('click', (e) => {
+  const star = e.target.closest('.star-btn');
+  if (star) { e.stopPropagation(); toggleFavorite(star.dataset.url); return; }
+  const item = e.target.closest('.channel-item');
+  if (!item) return;
+  const idx = parseInt(item.dataset.index);
+  const showAll = currentRole === 'seller';
+  const list = showAll ? filteredChannels : filteredChannels.filter(ch => !blockedChannels.some(b => b.channel_url === ch.url));
+  const ch = list[idx];
+  if (!ch) return;
+  if (ch.premium && currentRole !== 'seller') {
+    if (userProfile && userProfile.subscription_status === 'active') {
+      playChannel(ch);
+    } else {
+      showPremiumOverlay();
+    }
+    return;
+  }
+  playChannel(ch);
+});
+
+async function showPremiumOverlay() {
+  const statusEl = document.getElementById('subStatusInfo');
+  if (userProfile && userProfile.subscription_status) {
+    if (userProfile.subscription_status === 'active' && userProfile.subscription_end_date) {
+      const endDate = new Date(userProfile.subscription_end_date);
+      const now = new Date();
+      if (endDate > now) {
+        const days = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
+        statusEl.innerHTML = '<strong>Suscripción activa</strong> — Vence el ' + endDate.toLocaleDateString('es-AR') + ' (' + days + ' días)';
+        statusEl.className = 'sub-status';
+        statusEl.style.display = '';
+      } else {
+        statusEl.innerHTML = '<strong>Suscripción vencida</strong> — Venció el ' + endDate.toLocaleDateString('es-AR');
+        statusEl.className = 'sub-status expired';
+        statusEl.style.display = '';
+      }
+    } else if (userProfile.subscription_status === 'expired') {
+      statusEl.innerHTML = '<strong>Suscripción vencida</strong>';
+      statusEl.className = 'sub-status expired';
+      statusEl.style.display = '';
+    } else {
+      statusEl.style.display = 'none';
+    }
+  }
+  premiumOverlay.classList.add('visible');
+}
+
+function playChannel(ch) {
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+  video.pause(); video.removeAttribute('src'); video.onerror = null;
+  currentChannel = ch; retryChannel = ch;
+  placeholder.style.display = 'none';
+  hideOverlay(); showOverlay('⏳ Cargando...', ch.name, false);
+  activeInfo.classList.add('visible');
+  if (ch.tvgLogo) { activeLogo.src = ch.tvgLogo; activeLogo.style.display = ''; } else { activeLogo.style.display = 'none'; }
+  activeName.textContent = ch.name;
+  activeGroup.innerHTML = ch.groupTitle;
+  document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+
+  const tryPlay = () => {
+    video.play().then(() => hideOverlay()).catch(e => {
+      if (e.name === 'NotAllowedError') {
+        showOverlay('▶ Presioná acá para reproducir', ch.name, false);
+        playerOverlay.onclick = () => { hideOverlay(); video.play().catch(() => showOverlay('❌ No se pudo reproducir', 'Probá con otro canal', true)); };
+      }
+    });
+  };
+
+  const HLS_CONFIG = {
+    enableWorker: true, backbufferLength: 6, maxBufferLength: 30,
+    liveSyncDurationCount: 2, liveMaxLatencyDurationCount: 8,
+    fragLoadingMaxRetry: 10, manifestLoadingMaxRetry: 10, levelLoadingMaxRetry: 10,
+  };
+
+  const streamUrl = ch.url;
+
+  if (Hls.isSupported()) {
+    hlsInstance = new Hls(HLS_CONFIG);
+    hlsInstance.loadSource(streamUrl);
+    hlsInstance.attachMedia(video);
+    hlsInstance.on(Hls.Events.MANIFEST_PARSED, () => { playerOverlay.onclick = null; tryPlay(); });
+    hlsInstance.on(Hls.Events.ERROR, (e, data) => {
+      if (!data.fatal) return;
+      hlsInstance.destroy(); hlsInstance = null;
+      showOverlay('❌ No se pudo reproducir', 'Probá con otro canal o reintentá', true);
+    });
+  } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = streamUrl;
+    tryPlay();
+  } else {
+    video.src = streamUrl;
+    tryPlay();
+  }
+
+  // Cast: send to Chromecast if connected
+  if (isCasting && castSession) {
+    castMedia(streamUrl, ch.name);
+  }
+}
+
+retryBtn.addEventListener('click', () => { hideOverlay(); if (retryChannel) playChannel(retryChannel); });
+
+function filterChannels() {
+  const q = searchInput.value.toLowerCase().trim();
+  const activeFilter = document.querySelector('.filter-tab.active')?.dataset?.filter || 'public';
+  let list = q
+    ? channels.filter(ch => ch.name.toLowerCase().includes(q) || ch.groupTitle.toLowerCase().includes(q) || (ch.tvgChno && ch.tvgChno.includes(q)))
+    : channels;
+  if (activeFilter === 'public') list = list.filter(ch => !ch.premium);
+  else if (activeFilter === 'premium') list = list.filter(ch => ch.premium);
+  else if (activeFilter === 'favs') list = list.filter(ch => isFavorite(ch.url));
+  filteredChannels = list;
+  renderChannels(filteredChannels);
+}
+searchInput.addEventListener('input', filterChannels);
+
+document.getElementById('filterTabs').addEventListener('click', (e) => {
+  const tab = e.target.closest('.filter-tab');
+  if (!tab) return;
+  document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+  tab.classList.add('active');
+  filterChannels();
+});
+
+function showOverlay(msg, sub, showRetry) { overlayMsg.textContent = msg; overlaySubMsg.textContent = sub || ''; retryBtn.style.display = showRetry ? '' : 'none'; playerOverlay.classList.add('visible'); }
+function hideOverlay() { playerOverlay.classList.remove('visible'); playerOverlay.onclick = null; }
+function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.add('visible'); setTimeout(() => errorMsg.classList.remove('visible'), 8000); }
+
+// Volume
+volumeSlider.addEventListener('input', () => { video.volume = parseFloat(volumeSlider.value); updateMuteUI(); });
+muteBtn.addEventListener('click', () => { isMuted = !isMuted; video.muted = isMuted; updateMuteUI(); });
+function updateMuteUI() {
+  const v = video.volume;
+  muteBtn.textContent = isMuted || v === 0 ? '🔇' : v < 0.33 ? '🔈' : v < 0.66 ? '🔉' : '🔊';
+}
+
+// Fullscreen
+fsBtn.addEventListener('click', () => {
+  const container = document.getElementById('playerContainer');
+  if (!document.fullscreenElement) container.requestFullscreen().catch(() => {});
+  else document.exitFullscreen().catch(() => {});
+});
+document.addEventListener('fullscreenchange', () => { fsBtn.classList.toggle('active', !!document.fullscreenElement); });
+
+// ============ MERCADOPAGO ============
+let mpInstance = null;
+
+document.getElementById('mpPayBtn').addEventListener('click', async () => {
+  const btn = document.getElementById('mpPayBtn');
+  btn.disabled = true;
+  btn.textContent = 'Redirigiendo a MercadoPago...';
+
+  try {
+    const { data: { session } } = await supabaseClient.auth.getSession();
+    if (!session) { btn.disabled = false; btn.textContent = 'Suscribirme vía Mercado Pago'; return; }
+
+    const ip = await getUserIp();
+
+    const resp = await fetch(`${WORKER_URL}/api/create-preference`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        user_email: currentUser.email,
+        user_id: currentUser.id,
+        ip_address: ip,
+      }),
+    });
+
+    const data = await resp.json();
+    if (data.init_point) {
+      window.location.href = data.init_point;
+    } else if (data.error) {
+      alert('Error: ' + data.error);
+    }
+  } catch (e) {
+    alert('Error de conexión con el servidor de pagos');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Suscribirme vía Mercado Pago';
+  }
+});
+
+document.getElementById('mpCloseBtn').addEventListener('click', () => premiumOverlay.classList.remove('visible'));
+
+// Check if returning from MercadoPago
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('status') === 'approved' || urlParams.get('collection_status') === 'approved') {
+  window.history.replaceState({}, '', window.location.pathname);
+  setTimeout(() => {
+    alert('¡Pago aprobado! Tu suscripción ya está activa.');
+    restoreSession();
+  }, 500);
+}
+
+// ============ CHROMECAST (Web SDK) ============
+let castSession = null;
+let isCasting = false;
+const castBtn = document.getElementById('castBtn');
+const castDropdown = document.getElementById('castDropdown');
+const castDevices = document.getElementById('castDevices');
+const castSearching = document.getElementById('castSearching');
+const castOverlay = document.getElementById('castOverlay');
+const castMsg = document.getElementById('castMsg');
+const castSub = document.getElementById('castSub');
+const castStopBtn = document.getElementById('castStopBtn');
+
+function initCast() {
+  if (!window.chrome || !window.chrome.cast) {
+    castBtn.title = 'Cast no disponible en este navegador';
+    castBtn.style.opacity = '0.3';
+    return;
+  }
+
+  const castContext = cast.framework.CastContext.getInstance();
+  castContext.setOptions({
+    receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+    autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+  });
+
+  castContext.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, (e) => {
+    if (e.sessionState === cast.framework.SessionState.SESSION_STARTED) {
+      castSession = castContext.getCurrentSession();
+      isCasting = true;
+      castBtn.classList.add('connected');
+      castBtn.title = 'Desconectar Chromecast';
+      if (currentChannel) castMedia(currentChannel.url, currentChannel.name);
+    } else if (e.sessionState === cast.framework.SessionState.SESSION_ENDED || e.sessionState === cast.framework.SessionState.NO_SESSION) {
+      castSession = null;
+      isCasting = false;
+      castBtn.classList.remove('connected');
+      castOverlay.classList.remove('visible');
+    }
+  });
+}
+
+castBtn.addEventListener('click', () => {
+  if (!window.chrome || !window.chrome.cast) return;
+  const castContext = cast.framework.CastContext.getInstance();
+  if (isCasting && castSession) {
+    castSession.endSession(true);
+    return;
+  }
+  castContext.requestSession().catch(e => console.log('Cast session error:', e));
+});
+
+function castMedia(url, title) {
+  if (!castSession) return;
+  const mediaInfo = new chrome.cast.media.MediaInfo(url, url.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp2t');
+  mediaInfo.streamType = chrome.cast.media.StreamType.LIVE;
+  mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
+  mediaInfo.metadata.title = title || 'VEO+';
+
+  const request = new chrome.cast.media.LoadRequest(mediaInfo);
+  request.autoplay = true;
+
+  castSession.loadMedia(request).then(() => {
+    castMsg.textContent = 'Transmitiendo';
+    castSub.textContent = 'a ' + castSession.getCastDevice().friendlyName;
+    castOverlay.classList.add('visible');
+    video.pause();
+  }).catch(e => console.error('Cast load error:', e));
+}
+
+castStopBtn.addEventListener('click', () => {
+  if (castSession) castSession.endSession(true);
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.cast-wrap')) castDropdown.classList.remove('visible');
+});
+
+// ============ SUGGEST / SUPPORT ============
+const suggestModal = document.getElementById('suggestModal');
+const suggestTitle = document.getElementById('suggestTitle');
+const suggestSubject = document.getElementById('suggestSubject');
+const suggestDesc = document.getElementById('suggestDesc');
+
+document.getElementById('suggestBtn').addEventListener('click', () => {
+  suggestTitle.textContent = '💡 Sugerir canal';
+  suggestSubject.placeholder = 'Nombre del canal...';
+  suggestSubject.value = ''; suggestDesc.value = '';
+  suggestModal.classList.add('visible');
+});
+
+document.getElementById('supportBtn').addEventListener('click', () => {
+  suggestTitle.textContent = '🆘 Soporte';
+  suggestSubject.placeholder = 'Problema / consulta...';
+  suggestSubject.value = ''; suggestDesc.value = '';
+  suggestModal.classList.add('visible');
+});
+
+document.getElementById('suggestCancel').addEventListener('click', () => suggestModal.classList.remove('visible'));
+
+document.getElementById('suggestSend').addEventListener('click', () => {
+  const subject = suggestSubject.value.trim();
+  if (!subject) return;
+  const desc = suggestDesc.value.trim();
+  const userEmail = currentUser ? currentUser.email : '(no logueado)';
+  const emailSubject = encodeURIComponent((suggestTitle.textContent.includes('Sugerir') ? 'Sugerencia' : 'Soporte') + ': ' + subject);
+  const body = encodeURIComponent(desc + '\n\n---\nEnviado por: ' + userEmail);
+  window.open('mailto:hgastonsanchez@gmail.com?subject=' + emailSubject + '&body=' + body, '_blank');
+  suggestModal.classList.remove('visible');
+});
+
+// ============ ADMIN PANEL ============
+const adminPanel = document.getElementById('adminPanel');
+document.getElementById('adminBtn').addEventListener('click', () => { adminPanel.classList.add('visible'); loadAdminUsers(); loadAdminConfig(); renderAdminChannels(); });
+document.getElementById('adminCloseBtn').addEventListener('click', () => adminPanel.classList.remove('visible'));
+
+document.querySelectorAll('.admin-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('visible'));
+    document.getElementById('admin' + tab.dataset.section.charAt(0).toUpperCase() + tab.dataset.section.slice(1)).classList.add('visible');
+    if (tab.dataset.section === 'channels') renderAdminChannels();
+  });
+});
+
+async function loadAdminUsers() {
+  const { data } = await supabaseClient.from('profiles').select('id, email, role, ip_address, subscription_status, subscription_end_date');
+  if (!data) return;
+  document.getElementById('adminUsersBody').innerHTML = data.map(u => {
+    const subStatus = u.subscription_status || 'inactive';
+    const endDate = u.subscription_end_date ? new Date(u.subscription_end_date).toLocaleDateString('es-AR') : '—';
+    return '<tr><td>' + (u.email || '—') + '</td>' +
+      '<td><span class="role-badge ' + u.role + '">' + (u.role === 'seller' ? 'Admin' : 'User') + '</span></td>' +
+      '<td><span class="role-badge ' + subStatus + '">' + subStatus + '</span> <span style="font-size:10px;color:#555">' + endDate + '</span></td>' +
+      '<td style="font-size:11px;font-family:monospace;color:#888">' + (u.ip_address || '—') + '</td>' +
+      '<td>' +
+      (u.role === 'user'
+        ? '<button class="admin-action-btn" onclick="promoteUser(\'' + u.id + '\')">Hacer admin</button>'
+        : '<button class="admin-action-btn" onclick="demoteUser(\'' + u.id + '\')">Hacer user</button>') +
+      (u.ip_address ? ' <button class="admin-action-btn" onclick="releaseIp(\'' + u.id + '\')">Liberar IP</button>' : '') +
+      (subStatus !== 'active' ? ' <button class="admin-action-btn" onclick="activateSub(\'' + u.id + '\')">Activar 30d</button>' : '') +
+      ' <button class="admin-action-btn danger" onclick="deleteUser(\'' + u.id + '\',\'' + (u.email || '') + '\')">Eliminar</button></td></tr>';
+  }).join('');
+}
+
+window.promoteUser = async function(id) {
+  const { error } = await supabaseClient.rpc('promote_to_seller', { target_id: id });
+  if (error) { alert('Error: ' + error.message); return; }
+  loadAdminUsers();
+};
+window.demoteUser = async function(id) {
+  const { error } = await supabaseClient.rpc('demote_to_user', { target_id: id });
+  if (error) { alert('Error: ' + error.message); return; }
+  loadAdminUsers();
+};
+window.deleteUser = function(id, email) {
+  showConfirmModal('Eliminar usuario', '¿Eliminar a ' + email + '?', async () => {
+    const { error } = await supabaseClient.rpc('admin_delete_user', { target_id: id });
+    if (error) { alert('Error: ' + error.message); return; }
+    loadAdminUsers();
+  });
+};
+window.releaseIp = async function(id) {
+  const { error } = await supabaseClient.rpc('admin_release_ip', { target_id: id });
+  if (error) { alert('Error: ' + error.message); return; }
+  loadAdminUsers();
+};
+window.activateSub = async function(id) {
+  const { error } = await supabaseClient.rpc('admin_activate_subscription', { target_id: id, days: 30 });
+  if (error) { alert('Error: ' + error.message); return; }
+  loadAdminUsers();
+};
+
+document.getElementById('adminAddUserBtn').addEventListener('click', () => {
+  showInputModal('Nuevo usuario', 'Email del nuevo usuario', '', (email) => {
+    showInputModal('Contraseña para ' + email, 'Contraseña (mín. 6 caracteres)', '', async (pass) => {
+      const { error } = await supabaseClient.rpc('admin_create_user', { user_email: email, user_password: pass });
+      if (error) { alert('Error: ' + error.message); return; }
+      loadAdminUsers();
+    });
+  });
+});
+
+async function loadAdminConfig() {
+  const { data } = await supabaseClient.from('settings').select('key, value');
+  if (!data) return;
+  data.forEach(s => {
+    if (s.key === 'm3u_url_public') document.getElementById('adminM3uUrlPublic').value = s.value || '';
+    if (s.key === 'm3u_url_premium') document.getElementById('adminM3uUrlPremium').value = s.value || '';
+  });
+  document.getElementById('adminWebhookUrl').value = WORKER_URL + '/webhook/mercadopago';
+}
+
+document.getElementById('adminSaveConfig').addEventListener('click', async () => {
+  const errEl = document.getElementById('adminConfigError');
+  errEl.textContent = '';
+  const pubUrl = document.getElementById('adminM3uUrlPublic').value.trim();
+  const premUrl = document.getElementById('adminM3uUrlPremium').value.trim();
+  const upsert = async (k, v) => { const { error } = await supabaseClient.from('settings').upsert({ key: k, value: v }); if (error) throw error; };
+  try {
+    if (pubUrl) await upsert('m3u_url_public', pubUrl);
+    if (premUrl) await upsert('m3u_url_premium', premUrl);
+  } catch (e) { errEl.textContent = e.message; return; }
+  serverM3uUrlPublic = pubUrl; serverM3uUrlPremium = premUrl;
+  errEl.textContent = '✓ Guardado'; errEl.style.color = '#4caf50';
+  setTimeout(() => { errEl.textContent = ''; errEl.style.color = ''; }, 3000);
+});
+
+window.renderAdminChannels = function() {
+  const q = document.getElementById('adminChSearch').value.toLowerCase().trim();
+  const blocked = new Set(blockedChannels.map(b => b.channel_url));
+  let list = channels;
+  if (q) list = list.filter(ch => ch.name.toLowerCase().includes(q) || ch.url.toLowerCase().includes(q));
+  const el = document.getElementById('adminChList');
+  el.innerHTML = list.slice(0, 100).map(ch => {
+    const isBlocked = blocked.has(ch.url);
+    const escurl = ch.url.replace(/'/g, "\\'");
+    const escname = ch.name.replace(/'/g, "\\'");
+    return '<div class="admin-ch-item"><div class="ch-info"><div class="ch-name">' + ch.name + ' ' + (ch.premium ? '<span class="status-badge premium">PREMIUM</span>' : '') + '</div><div class="ch-url">' + ch.url.substring(0, 80) + '...</div></div>' +
+      '<button class="block-toggle' + (isBlocked ? ' blocked' : '') + '" onclick="toggleBlockChannel(\'' + escurl + '\',\'' + escname + '\')">' + (isBlocked ? '✓ Desbloquear' : 'Bloquear') + '</button></div>';
+  }).join('');
+  if (list.length > 100) el.innerHTML += '<div style="text-align:center;padding:12px;color:#555;font-size:12px;">Mostrando los primeros 100 canales.</div>';
+};
+
+window.toggleBlockChannel = async function(url, name) {
+  const existing = blockedChannels.find(b => b.channel_url === url);
+  if (existing) {
+    await supabaseClient.from('channel_blocks').delete().eq('channel_url', url);
+    blockedChannels = blockedChannels.filter(b => b.channel_url !== url);
+  } else {
+    await supabaseClient.from('channel_blocks').insert({ channel_url: url, channel_name: name });
+    blockedChannels.push({ channel_url: url, channel_name: name });
+  }
+  if (currentRole !== 'seller') filterChannels();
+  renderAdminChannels();
+};
+
+document.getElementById('adminChSearch').addEventListener('input', window.renderAdminChannels);
+
+// ============ MODALS ============
+function showInputModal(title, label, defaultValue, onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay visible';
+  overlay.innerHTML = '<div class="modal-box"><h3>' + title + '</h3><input type="text" id="modalInput" placeholder="' + label + '" value="' + (defaultValue || '') + '" style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid #2a2a4a;background:#12121e;color:#e0e0e0;font-size:14px;outline:none;margin-bottom:16px"><div class="modal-btns"><button id="modalCancel">Cancelar</button><button class="primary" id="modalOk">Aceptar</button></div></div>';
+  document.body.appendChild(overlay);
+  overlay.querySelector('#modalCancel').onclick = () => overlay.remove();
+  overlay.querySelector('#modalOk').onclick = () => { const val = overlay.querySelector('#modalInput').value.trim(); if (val) { onConfirm(val); overlay.remove(); } };
+  overlay.querySelector('#modalInput').focus(); overlay.querySelector('#modalInput').select();
+}
+
+function showConfirmModal(title, message, onConfirm) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay visible';
+  overlay.innerHTML = '<div class="modal-box"><h3>' + title + '</h3><p style="margin-bottom:16px;font-size:14px;color:#e0e0e0;">' + message + '</p><div class="modal-btns"><button id="modalCancel">Cancelar</button><button class="primary" id="modalOk">Eliminar</button></div></div>';
+  document.body.appendChild(overlay);
+  overlay.querySelector('#modalCancel').onclick = () => overlay.remove();
+  overlay.querySelector('#modalOk').onclick = () => { onConfirm(); overlay.remove(); };
+}
+
+// ============ START APP ============
+async function startApp() {
+  loadFavorites();
+  updateFavTabCount();
+  loading.classList.add('visible');
+  let allChannels = [];
+  try {
+    const pubText = await fetchChannelsFromWorker('public');
+    const pubChannels = parseM3U(pubText);
+    allChannels = pubChannels.map(ch => ({ ...ch, premium: false }));
+  } catch (err) {
+    showError('Error lista pública: ' + err.message);
+  }
+  if (currentRole === 'seller' || (userProfile && userProfile.subscription_status === 'active')) {
+    try {
+      const premText = await fetchChannelsFromWorker('premium');
+      const premChannels = parseM3U(premText);
+      allChannels = allChannels.concat(premChannels.map(ch => ({ ...ch, premium: true })));
+    } catch (err) {
+      console.warn('No se pudo cargar lista premium:', err.message);
+    }
+  }
+  channels = allChannels;
+  loading.classList.remove('visible');
+  if (allChannels.length === 0) { showError('No se pudieron cargar canales'); return; }
+  filterChannels();
+}
+
+// Init
+restoreSession();
+
+// Load Cast SDK
+setTimeout(() => {
+  try { initCast(); } catch (e) { console.log('Cast SDK not available'); }
+}, 1000);
+</script>
+</body>
+</html>
