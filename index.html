@@ -10,6 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://sdk.mercadopago.com/js/v2"></script>
+<script src="https://www.gstatic.com/cv2/js/cast_sender.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;height:100vh;overflow:hidden}
@@ -221,6 +222,23 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;he
 .block-toggle:hover{border-color:#f44336;color:#f44336}
 .block-toggle.blocked{background:#3a1a1a;border-color:#f44336;color:#f44336}
 .block-toggle.blocked:hover{border-color:#4caf50;color:#4caf50}
+.user-bar{display:flex;align-items:center;gap:8px;margin-top:6px;padding:6px 8px;background:#1a1a2e;border-radius:8px;border:1px solid #2a2a4a}
+.user-bar-avatar{width:28px;height:28px;border-radius:50%;background:#7c4dff;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.user-bar-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.user-bar-email{font-size:11px;color:#b388ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-bar-role{font-size:10px;color:#666}
+.user-bar-logout{background:none;border:1px solid #2a2a4a;color:#666;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.user-bar-logout:hover{border-color:#f44336;color:#f44336}
+.admin-section h3{font-size:14px;color:#888;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.admin-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
+.admin-stat{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px 16px}
+.admin-stat .stat-value{font-size:22px;font-weight:700;color:#b388ff}
+.admin-stat .stat-label{font-size:11px;color:#666;margin-top:2px}
+.admin-email-box{background:#12121e;border:1px solid #2a2a4a;border-radius:8px;padding:14px;margin-top:12px}
+.admin-email-box textarea{width:100%;min-height:80px;padding:10px;border-radius:6px;border:1px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;font-size:13px;outline:none;resize:vertical;font-family:inherit;margin-bottom:8px}
+.admin-email-box textarea:focus{border-color:#7c4dff}
+.admin-email-box input{width:100%;padding:8px 12px;border-radius:6px;border:1px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;font-size:13px;outline:none;margin-bottom:8px}
+.admin-email-box input:focus{border-color:#7c4dff}
 </style>
 </head>
 <body>
@@ -229,6 +247,14 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;he
     <div class="sidebar-header">
       <div>
         <h1><span>&#9654;</span> VEO+ <span class="version">v2.0 Web</span></h1>
+        <div class="user-bar" id="userBar" style="display:none">
+          <span class="user-bar-avatar" id="userAvatar">U</span>
+          <div class="user-bar-info">
+            <span class="user-bar-email" id="userBarEmail"></span>
+            <span class="user-bar-role" id="userBarRole"></span>
+          </div>
+          <button class="user-bar-logout" id="userLogoutBtn" title="Cerrar sesión">&#10148;</button>
+        </div>
       </div>
       <button class="admin-btn" id="adminBtn">&#9881; Admin</button>
     </div>
@@ -236,8 +262,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;he
       <input type="text" id="searchInput" placeholder="&#128269; Buscar canales...">
     </div>
     <div class="filter-tabs" id="filterTabs">
-      <button class="filter-tab active" data-filter="public">&#128250; PÚBLICO</button>
-      <button class="filter-tab" data-filter="premium">&#128274; PREMIUM</button>
+      <button class="filter-tab active" data-filter="all">&#128250; TODOS</button>
       <button class="filter-tab" data-filter="favs">&#9733; FAVORITOS</button>
     </div>
     <div class="channel-count" id="channelCount"></div>
@@ -364,20 +389,60 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;he
   </div>
   <div class="admin-body">
     <div class="admin-tabs">
-      <button class="admin-tab active" data-section="users">Usuarios</button>
-      <button class="admin-tab" data-section="config">Configuraci&#243;n</button>
+      <button class="admin-tab active" data-section="dashboard">Dashboard</button>
+      <button class="admin-tab" data-section="users">Usuarios</button>
       <button class="admin-tab" data-section="channels">Canales</button>
+      <button class="admin-tab" data-section="email">Email</button>
+      <button class="admin-tab" data-section="config">Configuraci&#243;n</button>
     </div>
-    <div class="admin-section visible" id="adminUsers">
-      <h3>Usuarios registrados</h3>
-      <button class="admin-add-btn" id="adminAddUserBtn">+ Nuevo usuario</button>
-      <table class="admin-table">
-        <thead><tr><th>Email</th><th>Rol</th><th>Suscripci&#243;n</th><th>IP</th><th>Acciones</th></tr></thead>
-        <tbody id="adminUsersBody"></tbody>
-      </table>
+    <div class="admin-section visible" id="adminDashboard">
+      <div class="admin-stat-grid" id="adminStats"></div>
+      <h3>&#128200; Actividad reciente</h3>
+      <div id="adminActivity" style="max-height:300px;overflow-y:auto;border:1px solid #2a2a4a;border-radius:8px"></div>
+    </div>
+    <div class="admin-section" id="adminUsers">
+      <h3>&#128101; Usuarios registrados</h3>
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+        <button class="admin-add-btn" id="adminAddUserBtn">+ Nuevo usuario</button>
+        <input type="text" id="adminUserSearch" placeholder="&#128269; Buscar usuario..." style="flex:1;min-width:200px;padding:8px 12px;border-radius:6px;border:1px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;font-size:12px;outline:none">
+        <select id="adminUserFilter" style="padding:8px 12px;border-radius:6px;border:1px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;font-size:12px;outline:none">
+          <option value="all">Todos</option>
+          <option value="active">Con suscripci&#243;n</option>
+          <option value="inactive">Sin suscripci&#243;n</option>
+          <option value="expired">Vencidos</option>
+          <option value="admin">Admins</option>
+        </select>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="admin-table">
+          <thead><tr><th>Email</th><th>Rol</th><th>Suscripci&#243;n</th><th>Vence</th><th>IP</th><th>Restringido</th><th>Acciones</th></tr></thead>
+          <tbody id="adminUsersBody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="admin-section" id="adminChannels">
+      <h3>&#128250; Gesti&#243;n de canales bloqueados</h3>
+      <p style="font-size:12px;color:#555;margin-bottom:12px;">Los canales bloqueados no se mostrar&#225;n a los usuarios regulares.</p>
+      <input type="text" id="adminChSearch" placeholder="&#128269; Buscar canal para bloquear/desbloquear..." style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;font-size:13px;outline:none;margin-bottom:12px;">
+      <div class="admin-ch-list" id="adminChList"></div>
+    </div>
+    <div class="admin-section" id="adminEmail">
+      <h3>&#9993; Enviar email a usuarios</h3>
+      <div class="admin-email-box">
+        <select id="emailTarget" style="width:100%;padding:8px 12px;border-radius:6px;border:1px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;font-size:13px;outline:none;margin-bottom:8px">
+          <option value="all">Todos los usuarios</option>
+          <option value="active">Solo con suscripci&#243;n activa</option>
+          <option value="inactive">Sin suscripci&#243;n</option>
+          <option value="expired">Suscripci&#243;n vencida</option>
+        </select>
+        <input type="text" id="emailSubject" placeholder="Asunto del email">
+        <textarea id="emailBody" placeholder="Escribí el mensaje acá..."></textarea>
+        <button class="admin-save-btn" id="sendEmailBtn">&#9993; Enviar email</button>
+        <div id="emailStatus" style="font-size:12px;margin-top:8px"></div>
+      </div>
     </div>
     <div class="admin-section" id="adminConfig">
-      <h3>Configuraci&#243;n general</h3>
+      <h3>&#9881; Configuraci&#243;n general</h3>
       <label style="font-size:13px;color:#888;">URL lista P&#250;BLICA (oculta para usuarios)</label>
       <div class="admin-config" style="margin-top:4px;">
         <input type="text" id="adminM3uUrlPublic" placeholder="https://...">
@@ -395,12 +460,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;he
       </div>
       <button class="admin-save-btn" id="adminSaveConfig">Guardar configuraci&#243;n</button>
       <div class="auth-error" id="adminConfigError"></div>
-    </div>
-    <div class="admin-section" id="adminChannels">
-      <h3>Gesti&#243;n de canales bloqueados</h3>
-      <p style="font-size:12px;color:#555;margin-bottom:12px;">Los canales bloqueados no se mostrar&#225;n a los usuarios regulares.</p>
-      <input type="text" id="adminChSearch" placeholder="&#128269; Buscar canal para bloquear/desbloquear..." style="width:100%;padding:10px 12px;border-radius:8px;border:1px solid #2a2a4a;background:#1a1a2e;color:#e0e0e0;font-size:13px;outline:none;margin-bottom:12px;">
-      <div class="admin-ch-list" id="adminChList"></div>
     </div>
   </div>
 </div>
@@ -524,16 +583,27 @@ async function onAuthSuccess(user) {
     if (!ipOk) return;
   }
 
-  document.querySelector('.auth-user')?.remove();
-  const userEl = document.createElement('span');
-  userEl.className = 'auth-user';
-  userEl.textContent = user.email + (currentRole === 'seller' ? ' (admin)' : '') + ' — cerrar sesión';
-  userEl.addEventListener('click', async () => { await supabaseClient.auth.signOut(); location.reload(); });
-  document.querySelector('.sidebar-header > div').appendChild(userEl);
+  // Show elegant user bar
+  const userBar = document.getElementById('userBar');
+  userBar.style.display = 'flex';
+  document.getElementById('userBarEmail').textContent = user.email;
+  document.getElementById('userBarRole').textContent = currentRole === 'seller' ? 'Administrador' : (userProfile.subscription_status === 'active' ? 'Suscriptor activo' : 'Cuenta gratuita');
+  document.getElementById('userAvatar').textContent = (user.email || '?')[0].toUpperCase();
+
+  document.getElementById('userLogoutBtn').addEventListener('click', async () => { await supabaseClient.auth.signOut(); location.reload(); });
+
   if (currentRole === 'seller') document.getElementById('adminBtn').classList.add('visible');
   await loadBlockedChannels();
   await loadSettings();
-  startApp();
+  await startApp();
+
+  // Show payment overlay if user has no active subscription (non-admins)
+  if (currentRole !== 'seller') {
+    const hasActive = userProfile && userProfile.subscription_status === 'active' && userProfile.subscription_end_date && new Date(userProfile.subscription_end_date) > new Date();
+    if (!hasActive) {
+      showPremiumOverlay();
+    }
+  }
 }
 
 // ============ IP BINDING ============
@@ -737,20 +807,22 @@ async function showPremiumOverlay() {
       const now = new Date();
       if (endDate > now) {
         const days = Math.ceil((endDate - now) / (1000 * 60 * 60 * 24));
-        statusEl.innerHTML = '<strong>Suscripción activa</strong> — Vence el ' + endDate.toLocaleDateString('es-AR') + ' (' + days + ' días)';
+        statusEl.innerHTML = '<strong>Suscripci\u00f3n activa</strong> \u2014 Vence el ' + endDate.toLocaleDateString('es-AR') + ' (' + days + ' d\u00edas)';
         statusEl.className = 'sub-status';
         statusEl.style.display = '';
       } else {
-        statusEl.innerHTML = '<strong>Suscripción vencida</strong> — Venció el ' + endDate.toLocaleDateString('es-AR');
+        statusEl.innerHTML = '<strong>Suscripci\u00f3n vencida</strong> \u2014 Venci\u00f3 el ' + endDate.toLocaleDateString('es-AR');
         statusEl.className = 'sub-status expired';
         statusEl.style.display = '';
       }
     } else if (userProfile.subscription_status === 'expired') {
-      statusEl.innerHTML = '<strong>Suscripción vencida</strong>';
+      statusEl.innerHTML = '<strong>Suscripci\u00f3n vencida</strong>';
       statusEl.className = 'sub-status expired';
       statusEl.style.display = '';
     } else {
-      statusEl.style.display = 'none';
+      statusEl.innerHTML = '<strong>Sin suscripci\u00f3n</strong> \u2014 Suscribite para acceder a todos los canales';
+      statusEl.className = 'sub-status expired';
+      statusEl.style.display = '';
     }
   }
   premiumOverlay.classList.add('visible');
@@ -813,13 +885,11 @@ retryBtn.addEventListener('click', () => { hideOverlay(); if (retryChannel) play
 
 function filterChannels() {
   const q = searchInput.value.toLowerCase().trim();
-  const activeFilter = document.querySelector('.filter-tab.active')?.dataset?.filter || 'public';
+  const activeFilter = document.querySelector('.filter-tab.active')?.dataset?.filter || 'all';
   let list = q
     ? channels.filter(ch => ch.name.toLowerCase().includes(q) || ch.groupTitle.toLowerCase().includes(q) || (ch.tvgChno && ch.tvgChno.includes(q)))
     : channels;
-  if (activeFilter === 'public') list = list.filter(ch => !ch.premium);
-  else if (activeFilter === 'premium') list = list.filter(ch => ch.premium);
-  else if (activeFilter === 'favs') list = list.filter(ch => isFavorite(ch.url));
+  if (activeFilter === 'favs') list = list.filter(ch => isFavorite(ch.url));
   filteredChannels = list;
   renderChannels(filteredChannels);
 }
@@ -918,43 +988,54 @@ const castMsg = document.getElementById('castMsg');
 const castSub = document.getElementById('castSub');
 const castStopBtn = document.getElementById('castStopBtn');
 
-function initCast() {
-  if (!window.chrome || !window.chrome.cast) {
+window.__onGCastApiAvailable = function(available) {
+  if (available) {
+    initCast();
+  } else {
     castBtn.title = 'Cast no disponible en este navegador';
     castBtn.style.opacity = '0.3';
-    return;
   }
+};
 
-  const castContext = cast.framework.CastContext.getInstance();
-  castContext.setOptions({
-    receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
-    autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
-  });
+function initCast() {
+  try {
+    const castContext = cast.framework.CastContext.getInstance();
+    castContext.setOptions({
+      receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+      autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED,
+    });
 
-  castContext.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, (e) => {
-    if (e.sessionState === cast.framework.SessionState.SESSION_STARTED) {
-      castSession = castContext.getCurrentSession();
-      isCasting = true;
-      castBtn.classList.add('connected');
-      castBtn.title = 'Desconectar Chromecast';
-      if (currentChannel) castMedia(currentChannel.url, currentChannel.name);
-    } else if (e.sessionState === cast.framework.SessionState.SESSION_ENDED || e.sessionState === cast.framework.SessionState.NO_SESSION) {
-      castSession = null;
-      isCasting = false;
-      castBtn.classList.remove('connected');
-      castOverlay.classList.remove('visible');
-    }
-  });
+    castContext.addEventListener(cast.framework.CastContextEventType.SESSION_STATE_CHANGED, (e) => {
+      if (e.sessionState === cast.framework.SessionState.SESSION_STARTED) {
+        castSession = castContext.getCurrentSession();
+        isCasting = true;
+        castBtn.classList.add('connected');
+        castBtn.title = 'Desconectar Chromecast';
+        if (currentChannel) castMedia(currentChannel.url, currentChannel.name);
+      } else if (e.sessionState === cast.framework.SessionState.SESSION_ENDED || e.sessionState === cast.framework.SessionState.NO_SESSION) {
+        castSession = null;
+        isCasting = false;
+        castBtn.classList.remove('connected');
+        castOverlay.classList.remove('visible');
+      }
+    });
+  } catch (e) {
+    console.warn('Cast init failed:', e);
+    castBtn.title = 'Cast no disponible en este navegador';
+    castBtn.style.opacity = '0.3';
+  }
 }
 
 castBtn.addEventListener('click', () => {
-  if (!window.chrome || !window.chrome.cast) return;
-  const castContext = cast.framework.CastContext.getInstance();
+  if (!window.chrome || !window.chrome.cast) { alert('Google Cast no está disponible en este navegador. Usá Chrome.'); return; }
   if (isCasting && castSession) {
     castSession.endSession(true);
     return;
   }
-  castContext.requestSession().catch(e => console.log('Cast session error:', e));
+  try {
+    const castContext = cast.framework.CastContext.getInstance();
+    castContext.requestSession().then(() => {}).catch(e => console.log('Cast session error:', e));
+  } catch (e) { console.warn('Cast request error:', e); }
 });
 
 function castMedia(url, title) {
@@ -1018,7 +1099,8 @@ document.getElementById('suggestSend').addEventListener('click', () => {
 
 // ============ ADMIN PANEL ============
 const adminPanel = document.getElementById('adminPanel');
-document.getElementById('adminBtn').addEventListener('click', () => { adminPanel.classList.add('visible'); loadAdminUsers(); loadAdminConfig(); renderAdminChannels(); });
+let allAdminUsers = [];
+document.getElementById('adminBtn').addEventListener('click', () => { adminPanel.classList.add('visible'); loadAdminDashboard(); loadAdminUsers(); loadAdminConfig(); renderAdminChannels(); });
 document.getElementById('adminCloseBtn').addEventListener('click', () => adminPanel.classList.remove('visible'));
 
 document.querySelectorAll('.admin-tab').forEach(tab => {
@@ -1026,27 +1108,79 @@ document.querySelectorAll('.admin-tab').forEach(tab => {
     document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
     document.querySelectorAll('.admin-section').forEach(s => s.classList.remove('visible'));
-    document.getElementById('admin' + tab.dataset.section.charAt(0).toUpperCase() + tab.dataset.section.slice(1)).classList.add('visible');
+    const sectionId = 'admin' + tab.dataset.section.charAt(0).toUpperCase() + tab.dataset.section.slice(1);
+    const sectionEl = document.getElementById(sectionId);
+    if (sectionEl) sectionEl.classList.add('visible');
     if (tab.dataset.section === 'channels') renderAdminChannels();
+    if (tab.dataset.section === 'dashboard') loadAdminDashboard();
   });
 });
 
-async function loadAdminUsers() {
-  const { data } = await supabaseClient.from('profiles').select('id, email, role, ip_address, subscription_status, subscription_end_date');
+async function loadAdminDashboard() {
+  const { data } = await supabaseClient.from('profiles').select('id, email, role, subscription_status, subscription_end_date, ip_address, created_at');
   if (!data) return;
+  const total = data.length;
+  const activeSubs = data.filter(u => u.subscription_status === 'active').length;
+  const inactive = data.filter(u => !u.subscription_status || u.subscription_status === 'inactive').length;
+  const expired = data.filter(u => u.subscription_status === 'expired').length;
+  const admins = data.filter(u => u.role === 'seller').length;
+  const bound = data.filter(u => u.ip_address).length;
+  document.getElementById('adminStats').innerHTML =
+    '<div class="admin-stat"><div class="stat-value">' + total + '</div><div class="stat-label">Total usuarios</div></div>' +
+    '<div class="admin-stat"><div class="stat-value" style="color:#4caf50">' + activeSubs + '</div><div class="stat-label">Suscripciones activas</div></div>' +
+    '<div class="admin-stat"><div class="stat-value" style="color:#ff9800">' + inactive + '</div><div class="stat-label">Sin suscripci\u00f3n</div></div>' +
+    '<div class="admin-stat"><div class="stat-value" style="color:#f44336">' + expired + '</div><div class="stat-label">Vencidos</div></div>' +
+    '<div class="admin-stat"><div class="stat-value" style="color:#b388ff">' + admins + '</div><div class="stat-label">Admins</div></div>' +
+    '<div class="admin-stat"><div class="stat-value" style="color:#64b5f6">' + bound + '</div><div class="stat-label">IPs vinculadas</div></div>';
+  const recent = data.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 10);
+  document.getElementById('adminActivity').innerHTML = recent.map(u =>
+    '<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #1a1a2e">' +
+    '<span style="font-size:11px;color:#555;min-width:120px">' + (u.created_at ? new Date(u.created_at).toLocaleDateString('es-AR') : '\u2014') + '</span>' +
+    '<span style="font-size:13px;flex:1">' + (u.email || '\u2014') + '</span>' +
+    '<span class="role-badge ' + (u.subscription_status || 'inactive') + '">' + (u.subscription_status || 'inactive') + '</span>' +
+    '</div>'
+  ).join('') || '<div style="padding:20px;text-align:center;color:#555;font-size:13px">Sin actividad</div>';
+}
+
+async function loadAdminUsers() {
+  const { data } = await supabaseClient.from('profiles').select('id, email, role, ip_address, subscription_status, subscription_end_date, restricted');
+  if (!data) return;
+  allAdminUsers = data;
+  renderAdminUserTable(data);
+  document.getElementById('adminUserSearch').oninput = filterAdminUsers;
+  document.getElementById('adminUserFilter').onchange = filterAdminUsers;
+}
+
+function filterAdminUsers() {
+  const q = (document.getElementById('adminUserSearch').value || '').toLowerCase().trim();
+  const filter = document.getElementById('adminUserFilter').value;
+  let list = allAdminUsers;
+  if (q) list = list.filter(u => (u.email || '').toLowerCase().includes(q));
+  if (filter === 'active') list = list.filter(u => u.subscription_status === 'active');
+  else if (filter === 'inactive') list = list.filter(u => !u.subscription_status || u.subscription_status === 'inactive');
+  else if (filter === 'expired') list = list.filter(u => u.subscription_status === 'expired');
+  else if (filter === 'admin') list = list.filter(u => u.role === 'seller');
+  renderAdminUserTable(list);
+}
+
+function renderAdminUserTable(data) {
   document.getElementById('adminUsersBody').innerHTML = data.map(u => {
     const subStatus = u.subscription_status || 'inactive';
-    const endDate = u.subscription_end_date ? new Date(u.subscription_end_date).toLocaleDateString('es-AR') : '—';
-    return '<tr><td>' + (u.email || '—') + '</td>' +
+    const endDate = u.subscription_end_date ? new Date(u.subscription_end_date).toLocaleDateString('es-AR') : '\u2014';
+    const restricted = u.restricted ? 'SI' : 'NO';
+    return '<tr style="' + (u.restricted ? 'opacity:0.5;' : '') + '"><td>' + (u.email || '\u2014') + '</td>' +
       '<td><span class="role-badge ' + u.role + '">' + (u.role === 'seller' ? 'Admin' : 'User') + '</span></td>' +
-      '<td><span class="role-badge ' + subStatus + '">' + subStatus + '</span> <span style="font-size:10px;color:#555">' + endDate + '</span></td>' +
-      '<td style="font-size:11px;font-family:monospace;color:#888">' + (u.ip_address || '—') + '</td>' +
-      '<td>' +
+      '<td><span class="role-badge ' + subStatus + '">' + subStatus + '</span></td>' +
+      '<td style="font-size:11px;color:#666">' + endDate + '</td>' +
+      '<td style="font-size:11px;font-family:monospace;color:#888">' + (u.ip_address || '\u2014') + '</td>' +
+      '<td style="font-size:11px;color:' + (u.restricted ? '#f44336' : '#4caf50') + '">' + restricted + '</td>' +
+      '<td style="white-space:nowrap">' +
       (u.role === 'user'
         ? '<button class="admin-action-btn" onclick="promoteUser(\'' + u.id + '\')">Hacer admin</button>'
         : '<button class="admin-action-btn" onclick="demoteUser(\'' + u.id + '\')">Hacer user</button>') +
       (u.ip_address ? ' <button class="admin-action-btn" onclick="releaseIp(\'' + u.id + '\')">Liberar IP</button>' : '') +
       (subStatus !== 'active' ? ' <button class="admin-action-btn" onclick="activateSub(\'' + u.id + '\')">Activar 30d</button>' : '') +
+      ' <button class="admin-action-btn" onclick="toggleRestrict(\'' + u.id + '\',' + (u.restricted ? 'true' : 'false') + ')">' + (u.restricted ? 'Desbloquear' : 'Restringir') + '</button>' +
       ' <button class="admin-action-btn danger" onclick="deleteUser(\'' + u.id + '\',\'' + (u.email || '') + '\')">Eliminar</button></td></tr>';
   }).join('');
 }
@@ -1062,7 +1196,7 @@ window.demoteUser = async function(id) {
   loadAdminUsers();
 };
 window.deleteUser = function(id, email) {
-  showConfirmModal('Eliminar usuario', '¿Eliminar a ' + email + '?', async () => {
+  showConfirmModal('Eliminar usuario', '\u00bfEliminar a ' + email + '? Esta acci\u00f3n no se puede deshacer.', async () => {
     const { error } = await supabaseClient.rpc('admin_delete_user', { target_id: id });
     if (error) { alert('Error: ' + error.message); return; }
     loadAdminUsers();
@@ -1078,15 +1212,48 @@ window.activateSub = async function(id) {
   if (error) { alert('Error: ' + error.message); return; }
   loadAdminUsers();
 };
+window.toggleRestrict = async function(id, currentRestricted) {
+  const { error } = await supabaseClient.from('profiles').update({ restricted: !currentRestricted }).eq('id', id);
+  if (error) { alert('Error: ' + error.message); return; }
+  loadAdminUsers();
+};
 
 document.getElementById('adminAddUserBtn').addEventListener('click', () => {
   showInputModal('Nuevo usuario', 'Email del nuevo usuario', '', (email) => {
-    showInputModal('Contraseña para ' + email, 'Contraseña (mín. 6 caracteres)', '', async (pass) => {
+    showInputModal('Contrase\u00f1a para ' + email, 'Contrase\u00f1a (m\u00edn. 6 caracteres)', '', async (pass) => {
       const { error } = await supabaseClient.rpc('admin_create_user', { user_email: email, user_password: pass });
       if (error) { alert('Error: ' + error.message); return; }
       loadAdminUsers();
     });
   });
+});
+
+document.getElementById('sendEmailBtn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('emailStatus');
+  const subject = document.getElementById('emailSubject').value.trim();
+  const body = document.getElementById('emailBody').value.trim();
+  const target = document.getElementById('emailTarget').value;
+  if (!subject || !body) { statusEl.style.color = '#f44336'; statusEl.textContent = 'Completá asunto y mensaje'; return; }
+  statusEl.style.color = '#888'; statusEl.textContent = 'Obteniendo lista de usuarios...';
+  const { data } = await supabaseClient.from('profiles').select('email, subscription_status');
+  if (!data) { statusEl.style.color = '#f44336'; statusEl.textContent = 'Error al obtener usuarios'; return; }
+  let recipients = data;
+  if (target === 'active') recipients = data.filter(u => u.subscription_status === 'active');
+  else if (target === 'inactive') recipients = data.filter(u => !u.subscription_status || u.subscription_status === 'inactive');
+  else if (target === 'expired') recipients = data.filter(u => u.subscription_status === 'expired');
+  const emails = recipients.map(u => u.email).filter(Boolean);
+  if (emails.length === 0) { statusEl.style.color = '#f44336'; statusEl.textContent = 'No hay usuarios para ese filtro'; return; }
+  statusEl.style.color = '#888'; statusEl.textContent = 'Enviando a ' + emails.length + ' usuarios...';
+  let sent = 0;
+  for (const email of emails) {
+    try {
+      const mailtoLink = 'mailto:' + email + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body + '\n\n---\nEnviado por VEO+ Admin');
+      window.open(mailtoLink, '_blank');
+      sent++;
+    } catch (e) {}
+  }
+  statusEl.style.color = '#4caf50';
+  statusEl.textContent = '\u2713 Se abrieron ' + sent + ' ventanas de email (' + emails.length + ' destinatarios). Completá y enviá cada una.';
 });
 
 async function loadAdminConfig() {
@@ -1198,8 +1365,10 @@ restoreSession();
 
 // Load Cast SDK
 setTimeout(() => {
-  try { initCast(); } catch (e) { console.log('Cast SDK not available'); }
-}, 1000);
+  if (window.cast && window.cast.framework) {
+    try { initCast(); } catch (e) { console.log('Cast SDK init error'); }
+  }
+}, 2000);
 </script>
 </body>
 </html>
