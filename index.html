@@ -250,7 +250,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;he
         <div class="user-bar" id="userBar" style="display:none">
           <span class="user-bar-avatar" id="userAvatar">U</span>
           <div class="user-bar-info">
-            <span class="user-bar-email" id="userBarEmail"></span>
             <span class="user-bar-role" id="userBarRole"></span>
           </div>
           <button class="user-bar-logout" id="userLogoutBtn" title="Cerrar sesi&#243;n">Cerrar sesi&#243;n</button>
@@ -624,8 +623,10 @@ async function onAuthSuccess(user) {
   currentUser = user;
   let { data: profile, error: pErr } = await supabaseClient.from('profiles').select('*').eq('id', user.id).single();
   if (!profile) {
-    const { data: ins } = await supabaseClient.from('profiles').insert({ id: user.id, email: user.email, role: 'user', subscription_status: 'inactive' }).select('*').single();
+    const now = new Date().toISOString();
+    const { data: ins } = await supabaseClient.from('profiles').insert({ id: user.id, email: user.email, role: 'user', subscription_status: 'inactive', created_at: now }).select('*').single();
     profile = ins;
+    localStorage.setItem('veo_trial_start_' + user.id, now);
   }
   userProfile = profile;
   currentRole = profile ? profile.role : 'user';
@@ -640,8 +641,8 @@ async function onAuthSuccess(user) {
   // Show elegant user bar
   const userBar = document.getElementById('userBar');
   userBar.style.display = 'flex';
-  document.getElementById('userBarEmail').textContent = user.email;
-  document.getElementById('userBarRole').textContent = currentRole === 'seller' ? 'Administrador' : (userProfile.subscription_status === 'active' ? 'Suscriptor activo' : 'Cuenta gratuita');
+  const emailShort = (user.email || '').split('@')[0];
+  document.getElementById('userBarRole').textContent = currentRole === 'seller' ? emailShort + ' \u2022 Admin' : (userProfile.subscription_status === 'active' ? emailShort + ' \u2022 Suscriptor' : emailShort);
   document.getElementById('userAvatar').textContent = (user.email || '?')[0].toUpperCase();
 
   document.getElementById('userLogoutBtn').addEventListener('click', async () => { await supabaseClient.auth.signOut(); location.reload(); });
@@ -651,13 +652,42 @@ async function onAuthSuccess(user) {
   await loadSettings();
   await startApp();
 
-  // Show payment overlay if user has no active subscription (non-admins)
+  // Trial + subscription check for non-admins
   if (currentRole !== 'seller') {
     const hasActive = userProfile && userProfile.subscription_status === 'active' && userProfile.subscription_end_date && new Date(userProfile.subscription_end_date) > new Date();
-    if (!hasActive) {
-      showPremiumOverlay();
+    if (hasActive) return;
+
+    // Check trial: 5 minutes from profile created_at
+    const createdAt = userProfile && userProfile.created_at ? new Date(userProfile.created_at) : null;
+    const trialKey = 'veo_trial_start_' + user.id;
+    let trialStart = localStorage.getItem(trialKey);
+    if (!trialStart && createdAt) {
+      trialStart = createdAt.toISOString();
+      localStorage.setItem(trialKey, trialStart);
     }
+    if (trialStart) {
+      const elapsed = (Date.now() - new Date(trialStart).getTime()) / 1000 / 60;
+      if (elapsed < 5) {
+        // Still in trial - show timer message
+        const remaining = Math.ceil(5 - elapsed);
+        showTrialOverlay(remaining);
+        return;
+      }
+    }
+    // No trial left, no subscription - show payment overlay
+    showPremiumOverlay();
   }
+}
+
+// ============ TRIAL ============
+function showTrialOverlay(minutesLeft) {
+  const statusEl = document.getElementById('subStatusInfo');
+  statusEl.innerHTML = '<strong style="color:#ff9800">Prueba gratuita</strong> \u2014 Te quedan ' + minutesLeft + ' minuto' + (minutesLeft !== 1 ? 's' : '') + ' de acceso libre. Despu\u00e9s necesit\u00e1s una suscripci\u00f3n.';
+  statusEl.className = 'sub-status';
+  statusEl.style.display = '';
+  premiumOverlay.classList.add('visible');
+  // Auto-hide after a few seconds so they can browse
+  setTimeout(() => { premiumOverlay.classList.remove('visible'); }, 4000);
 }
 
 // ============ IP BINDING ============
@@ -843,9 +873,20 @@ channelList.addEventListener('click', (e) => {
   const ch = list[idx];
   if (!ch) return;
   if (ch.premium && currentRole !== 'seller') {
-    if (userProfile && userProfile.subscription_status === 'active') {
+    const hasActive = userProfile && userProfile.subscription_status === 'active' && userProfile.subscription_end_date && new Date(userProfile.subscription_end_date) > new Date();
+    if (hasActive) {
       playChannel(ch);
     } else {
+      // Check trial
+      const trialKey = 'veo_trial_start_' + currentUser.id;
+      const trialStart = localStorage.getItem(trialKey);
+      if (trialStart) {
+        const elapsed = (Date.now() - new Date(trialStart).getTime()) / 1000 / 60;
+        if (elapsed < 5) {
+          playChannel(ch);
+          return;
+        }
+      }
       showPremiumOverlay();
     }
     return;
@@ -1393,16 +1434,14 @@ async function startApp() {
     const pubChannels = parseM3U(pubText);
     allChannels = pubChannels.map(ch => ({ ...ch, premium: false }));
   } catch (err) {
-    showError('Error lista pública: ' + err.message);
+    showError('Error lista p\u00fablica: ' + err.message);
   }
-  if (currentRole === 'seller' || (userProfile && userProfile.subscription_status === 'active')) {
-    try {
-      const premText = await fetchChannelsFromWorker('premium');
-      const premChannels = parseM3U(premText);
-      allChannels = allChannels.concat(premChannels.map(ch => ({ ...ch, premium: true })));
-    } catch (err) {
-      console.warn('No se pudo cargar lista premium:', err.message);
-    }
+  try {
+    const premText = await fetchChannelsFromWorker('premium');
+    const premChannels = parseM3U(premText);
+    allChannels = allChannels.concat(premChannels.map(ch => ({ ...ch, premium: true })));
+  } catch (err) {
+    console.warn('No se pudo cargar lista premium:', err.message);
   }
   channels = allChannels;
   loading.classList.remove('visible');
