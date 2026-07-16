@@ -227,8 +227,8 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;he
 .user-bar-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
 .user-bar-email{font-size:11px;color:#b388ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .user-bar-role{font-size:10px;color:#666}
-.user-bar-logout{background:none;border:1px solid #2a2a4a;color:#666;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.user-bar-logout:hover{border-color:#f44336;color:#f44336}
+.user-bar-logout{background:none;border:1px solid #f44336;color:#f44336;padding:4px 10px;border-radius:6px;font-size:11px;cursor:pointer;flex-shrink:0;white-space:nowrap}
+.user-bar-logout:hover{background:#f44336;color:#fff}
 .admin-section h3{font-size:14px;color:#888;margin-bottom:12px;display:flex;align-items:center;gap:8px}
 .admin-stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px}
 .admin-stat{background:#1a1a2e;border:1px solid #2a2a4a;border-radius:10px;padding:14px 16px}
@@ -250,9 +250,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;he
         <div class="user-bar" id="userBar" style="display:none">
           <span class="user-bar-avatar" id="userAvatar">U</span>
           <div class="user-bar-info">
+            <span class="user-bar-email" id="userBarEmail"></span>
             <span class="user-bar-role" id="userBarRole"></span>
           </div>
-          <button class="user-bar-logout" id="userLogoutBtn" title="Cerrar sesi&#243;n">&#10148;</button>
+          <button class="user-bar-logout" id="userLogoutBtn" title="Cerrar sesi&#243;n">Cerrar sesi&#243;n</button>
         </div>
           <button class="user-bar-logout" id="userLogoutBtn" title="Cerrar sesión">&#10148;</button>
         </div>
@@ -641,6 +642,7 @@ async function onAuthSuccess(user) {
   // Show elegant user bar
   const userBar = document.getElementById('userBar');
   userBar.style.display = 'flex';
+  document.getElementById('userBarEmail').textContent = user.email;
   document.getElementById('userBarRole').textContent = currentRole === 'seller' ? 'Administrador' : (userProfile.subscription_status === 'active' ? 'Suscriptor activo' : 'Cuenta gratuita');
   document.getElementById('userAvatar').textContent = (user.email || '?')[0].toUpperCase();
 
