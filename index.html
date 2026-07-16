@@ -713,7 +713,7 @@ function startTrialCountdown() {
     if (remaining <= 0) {
       banner.style.display = 'none';
       clearInterval(trialInterval);
-      showPremiumOverlay();
+      showPremiumOverlay(true);
       return;
     }
     const mins = Math.floor(remaining / 60);
@@ -922,16 +922,20 @@ channelList.addEventListener('click', (e) => {
           return;
         }
       }
-      showPremiumOverlay();
+      showPremiumOverlay(true);
     }
     return;
   }
   playChannel(ch);
 });
 
-async function showPremiumOverlay() {
+async function showPremiumOverlay(trialExpired) {
   const statusEl = document.getElementById('subStatusInfo');
-  if (userProfile && userProfile.subscription_status) {
+  if (trialExpired) {
+    statusEl.innerHTML = '<strong style="color:#ff9800">Tu tiempo de prueba ha finalizado</strong> \u2014 Contrat\u00e1 un mes por <strong>$5.000</strong> y acced\u00e9 a todos los canales sin restricciones.';
+    statusEl.className = 'sub-status expired';
+    statusEl.style.display = '';
+  } else if (userProfile && userProfile.subscription_status) {
     if (userProfile.subscription_status === 'active' && userProfile.subscription_end_date) {
       const endDate = new Date(userProfile.subscription_end_date);
       const now = new Date();
@@ -1273,8 +1277,13 @@ async function loadAdminDashboard() {
 }
 
 async function loadAdminUsers() {
-  const { data } = await supabaseClient.from('profiles').select('id, email, role, ip_address, subscription_status, subscription_end_date, restricted');
-  if (!data) return;
+  let { data, error } = await supabaseClient.from('profiles').select('id, email, role, ip_address, subscription_status, subscription_end_date, restricted');
+  if (error || !data) {
+    const fallback = await supabaseClient.from('profiles').select('id, email, role, ip_address, subscription_status, subscription_end_date');
+    data = fallback.data;
+    if (!data) return;
+    data.forEach(u => u.restricted = false);
+  }
   allAdminUsers = data;
   renderAdminUserTable(data);
   document.getElementById('adminUserSearch').oninput = filterAdminUsers;
