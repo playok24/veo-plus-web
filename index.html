@@ -640,10 +640,9 @@ async function onAuthSuccess(user) {
   currentRole = profile ? profile.role : 'user';
   authScreen.classList.remove('visible');
 
-  // IP check via Worker
+  // IP check via Worker (non-blocking: load channels first, check IP in background)
   if (currentRole !== 'seller') {
-    const ipOk = await checkIpBinding();
-    if (!ipOk) return;
+    checkIpBinding();
   }
 
   // Show elegant user bar
