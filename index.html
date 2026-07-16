@@ -250,9 +250,10 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;he
         <div class="user-bar" id="userBar" style="display:none">
           <span class="user-bar-avatar" id="userAvatar">U</span>
           <div class="user-bar-info">
-            <span class="user-bar-email" id="userBarEmail"></span>
             <span class="user-bar-role" id="userBarRole"></span>
           </div>
+          <button class="user-bar-logout" id="userLogoutBtn" title="Cerrar sesi&#243;n">&#10148;</button>
+        </div>
           <button class="user-bar-logout" id="userLogoutBtn" title="Cerrar sesión">&#10148;</button>
         </div>
       </div>
@@ -462,10 +463,6 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;he
       <div class="admin-config" style="margin-top:4px;">
         <input type="text" id="adminM3uUrlPublic" placeholder="https://...">
       </div>
-      <label style="font-size:13px;color:#888;margin-top:12px;">URL lista PREMIUM (oculta para usuarios)</label>
-      <div class="admin-config" style="margin-top:4px;">
-        <input type="text" id="adminM3uUrlPremium" placeholder="https://...">
-      </div>
       <div style="margin-top:16px;">
         <label style="font-size:13px;color:#888;">URL Webhook Mercado Pago</label>
         <div class="admin-config" style="margin-top:4px;">
@@ -644,7 +641,6 @@ async function onAuthSuccess(user) {
   // Show elegant user bar
   const userBar = document.getElementById('userBar');
   userBar.style.display = 'flex';
-  document.getElementById('userBarEmail').textContent = user.email;
   document.getElementById('userBarRole').textContent = currentRole === 'seller' ? 'Administrador' : (userProfile.subscription_status === 'active' ? 'Suscriptor activo' : 'Cuenta gratuita');
   document.getElementById('userAvatar').textContent = (user.email || '?')[0].toUpperCase();
 
@@ -1319,7 +1315,6 @@ async function loadAdminConfig() {
   if (!data) return;
   data.forEach(s => {
     if (s.key === 'm3u_url_public') document.getElementById('adminM3uUrlPublic').value = s.value || '';
-    if (s.key === 'm3u_url_premium') document.getElementById('adminM3uUrlPremium').value = s.value || '';
   });
   document.getElementById('adminWebhookUrl').value = WORKER_URL + '/webhook/mercadopago';
 }
@@ -1328,14 +1323,11 @@ document.getElementById('adminSaveConfig').addEventListener('click', async () =>
   const errEl = document.getElementById('adminConfigError');
   errEl.textContent = '';
   const pubUrl = document.getElementById('adminM3uUrlPublic').value.trim();
-  const premUrl = document.getElementById('adminM3uUrlPremium').value.trim();
-  const upsert = async (k, v) => { const { error } = await supabaseClient.from('settings').upsert({ key: k, value: v }); if (error) throw error; };
   try {
-    if (pubUrl) await upsert('m3u_url_public', pubUrl);
-    if (premUrl) await upsert('m3u_url_premium', premUrl);
+    if (pubUrl) { const { error } = await supabaseClient.from('settings').upsert({ key: 'm3u_url_public', value: pubUrl }); if (error) throw error; }
   } catch (e) { errEl.textContent = e.message; return; }
-  serverM3uUrlPublic = pubUrl; serverM3uUrlPremium = premUrl;
-  errEl.textContent = '✓ Guardado'; errEl.style.color = '#4caf50';
+  serverM3uUrlPublic = pubUrl;
+  errEl.textContent = '\u2713 Guardado'; errEl.style.color = '#4caf50';
   setTimeout(() => { errEl.textContent = ''; errEl.style.color = ''; }, 3000);
 });
 
