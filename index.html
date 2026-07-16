@@ -134,7 +134,7 @@ body{font-family:'Segoe UI',Arial,sans-serif;background:#1a1a2e;color:#e0e0e0;he
 .sidebar-footer{border-top:1px solid #1a1a2e;padding:8px 12px;display:flex;gap:6px;flex-shrink:0}
 .sidebar-footer .s-btn{flex:1;padding:6px 8px;border-radius:6px;border:1px solid #2a2a4a;background:transparent;color:#666;font-size:11px;cursor:pointer;text-align:center}
 .sidebar-footer .s-btn:hover{border-color:#7c4dff;color:#b388ff}
-.premium-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);align-items:center;justify-content:center;z-index:2000;flex-direction:column}
+.premium-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:2000;flex-direction:column}
 .premium-overlay.visible{display:flex}
 .premium-box{background:#1a1a2e;border:1px solid #ff9800;border-radius:16px;padding:40px 32px;width:420px;max-width:90vw;text-align:center}
 .premium-box .lock-icon{font-size:48px;margin-bottom:12px}
@@ -682,8 +682,7 @@ async function onAuthSuccess(user) {
         return;
       }
     }
-    // No trial left, no subscription - show payment overlay
-    showPremiumOverlay();
+    // No trial left, no subscription - channels visible but premium locked
   }
 }
 
