@@ -581,9 +581,15 @@ async function handleResetPassword() {
   try {
     const params = new URLSearchParams(hash.substring(1));
     const accessToken = params.get('access_token');
+    const refreshToken = params.get('refresh_token');
     const type = params.get('type');
     if (!accessToken || type !== 'recovery') return;
     window.history.replaceState({}, '', window.location.pathname);
+    const { error: sessErr } = await supabaseClient.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken || '',
+    });
+    if (sessErr) { console.warn('Session set error:', sessErr); }
     document.getElementById('resetScreen').classList.add('visible');
   } catch (e) {
     console.warn('Reset parse error:', e);
@@ -597,12 +603,16 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
   const okEl = document.getElementById('resetSuccess');
   errEl.textContent = ''; okEl.textContent = '';
   if (!pass1 || !pass2) { errEl.textContent = 'Completá ambos campos'; return; }
-  if (pass1.length < 6) { errEl.textContent = 'M\u00ednimo 6 caracteres'; return; }
-  if (pass1 !== pass2) { errEl.textContent = 'Las contrase\u00f1as no coinciden'; return; }
-  const { error } = await supabaseClient.auth.updateUser({ password: pass1 });
+  if (pass1.length < 6) { errEl.textContent = 'Mínimo 6 caracteres'; return; }
+  if (pass1 !== pass2) { errEl.textContent = 'Las contraseñas no coinciden'; return; }
+  document.getElementById('resetBtn').disabled = true;
+  document.getElementById('resetBtn').textContent = 'Guardando...';
+  const { data, error } = await supabaseClient.auth.updateUser({ password: pass1 });
+  document.getElementById('resetBtn').disabled = false;
+  document.getElementById('resetBtn').textContent = 'Guardar contraseña';
   if (error) { errEl.textContent = error.message; return; }
-  okEl.textContent = '\u2713 Contrase\u00f1a actualizada. Redirigiendo...';
-  setTimeout(() => { document.getElementById('resetScreen').classList.remove('visible'); }, 2000);
+  okEl.textContent = '✓ Contraseña actualizada. Redirigiendo...';
+  setTimeout(() => { document.getElementById('resetScreen').classList.remove('visible'); location.reload(); }, 2000);
 });
 
 handleResetPassword();
