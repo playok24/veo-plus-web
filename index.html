@@ -887,10 +887,11 @@ function renderChannels(list) {
     item.dataset.index = i;
     const hasLogo = ch.tvgLogo && ch.tvgLogo.trim();
     const starred = isFavorite(ch.url);
+    const isAdmin = currentRole === 'seller';
     item.innerHTML = '<button class="star-btn' + (starred ? ' active' : '') + '" data-url="' + ch.url.replace(/"/g, '&quot;') + '">' + (starred ? '★' : '☆') + '</button>' +
       '<span class="channel-number">' + (ch.tvgChno || '') + '</span>' +
       (hasLogo ? '<img class="channel-logo" src="' + ch.tvgLogo + '" alt="" loading="lazy" onerror="this.style.display=\'none\'">' : '<div class="channel-no-logo">' + ch.name.charAt(0).toUpperCase() + '</div>') +
-      '<div class="channel-info"><div class="channel-name">' + (ch.premium ? '🔒 ' : '') + ch.name + '</div><div class="channel-group">' + (ch.premium ? '<span class="status-badge premium">PREMIUM</span> ' : '') + ch.groupTitle + '</div></div>';
+      '<div class="channel-info"><div class="channel-name">' + (!isAdmin && ch.premium ? '🔒 ' : '') + ch.name + '</div><div class="channel-group">' + (!isAdmin && ch.premium ? '<span class="status-badge premium">PREMIUM</span> ' : '') + ch.groupTitle + '</div></div>';
     channelList.appendChild(item);
   });
   const total = visibleList.length;
