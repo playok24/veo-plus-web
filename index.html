@@ -669,9 +669,11 @@ async function onAuthSuccess(user) {
     const createdAt = userProfile && userProfile.created_at ? new Date(userProfile.created_at) : null;
     const trialKey = 'veo_trial_start_' + user.id;
     let trialStart = localStorage.getItem(trialKey);
-    if (!trialStart && createdAt) {
-      trialStart = createdAt.toISOString();
-      localStorage.setItem(trialKey, trialStart);
+    if (!trialStart) {
+      // First time with trial feature - start trial NOW
+      const now = new Date().toISOString();
+      trialStart = now;
+      localStorage.setItem(trialKey, now);
     }
     if (trialStart) {
       const elapsed = (Date.now() - new Date(trialStart).getTime()) / 1000 / 60;
@@ -1463,17 +1465,31 @@ async function startApp() {
   updateFavTabCount();
   loading.classList.add('visible');
   let allChannels = [];
+  const seenUrls = new Set();
   try {
     const pubText = await fetchChannelsFromWorker('public');
     const pubChannels = parseM3U(pubText);
-    allChannels = pubChannels.map(ch => ({ ...ch, premium: false }));
+    pubChannels.forEach(ch => {
+      if (ch.url && !seenUrls.has(ch.url)) {
+        seenUrls.add(ch.url);
+        allChannels.push({ ...ch, premium: false });
+      }
+    });
   } catch (err) {
     showError('Error lista p\u00fablica: ' + err.message);
   }
   try {
     const premText = await fetchChannelsFromWorker('premium');
     const premChannels = parseM3U(premText);
-    allChannels = allChannels.concat(premChannels.map(ch => ({ ...ch, premium: true })));
+    premChannels.forEach(ch => {
+      if (ch.url && !seenUrls.has(ch.url)) {
+        seenUrls.add(ch.url);
+        allChannels.push({ ...ch, premium: true });
+      } else if (ch.url && seenUrls.has(ch.url)) {
+        const existing = allChannels.find(c => c.url === ch.url);
+        if (existing) existing.premium = true;
+      }
+    });
   } catch (err) {
     console.warn('No se pudo cargar lista premium:', err.message);
   }
